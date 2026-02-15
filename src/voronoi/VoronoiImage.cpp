@@ -85,11 +85,11 @@ double VoronoiImage::distanceToNearestEdge(int x, int y) {
   return std::sqrt(dist2(Pixel(x, y), nearest));
 }
 
-double VoronoiImage::getMaxDist() { return std::sqrt(max_dist2_); }
+double VoronoiImage::getMaxDist() const { return std::sqrt(max_dist2_); }
 
 int VoronoiImage::getIndex(int x, int y) { return y * width_ + x; }
 
-bool VoronoiImage::isBoundary(std::vector<int8_t> &image_, int x, int y) {
+bool VoronoiImage::isBoundary(const std::vector<int8_t> &image_, int x, int y) {
   if (image_[getIndex(x, y)] != 100)
     return false;
 

@@ -14,12 +14,12 @@ public:
   void setGrid(nav_msgs::msg::OccupancyGrid::SharedPtr map);
   double distanceToNearestObstacle(int x, int y);
   double distanceToNearestEdge(int x, int y);
-  double getMaxDist();
+  double getMaxDist() const;
   void ComputeFT();
 
 private:
   int getIndex(int x, int y);
-  bool isBoundary(std::vector<int8_t> &image_, int x, int y);
+  bool isBoundary(const std::vector<int8_t> &image_, int x, int y);
   bool isValid(int x, int y);
 
   long long dist2(const Pixel &a, const Pixel &b);
