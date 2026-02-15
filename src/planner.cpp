@@ -29,7 +29,8 @@ public:
 
 private:
   void mapCallback(const nav_msgs::msg::OccupancyGrid::SharedPtr msg) {
-    latest_map_ = msg;
+    auto latest_map_ =
+        std::make_shared<nav_msgs::msg::OccupancyGrid>(*msg);
   }
 
   void timerCallback() {
@@ -41,15 +42,25 @@ private:
     nav_msgs::msg::OccupancyGrid costmap;
 
     costmap.header.stamp = this->now();
-    costmap.header.frame_id = latest_map_->header.frame_id; 
+    costmap.header.frame_id = latest_map_->header.frame_id;
 
     costmap.info = latest_map_->info;
     costmap.data.resize(costmap.info.width * costmap.info.height);
 
+    double dO_max = voronoi_.getMaxDist();
+    double alpha = 0.3;
     for (unsigned int y = 0; y < costmap.info.height; y++) {
       for (unsigned int x = 0; x < costmap.info.width; x++) {
         int idx = y * costmap.info.width + x;
-        costmap.data[idx] = voronoi_.isEdge(x, y) * 100;
+
+        double dO = voronoi_.distanceToNearestObstacle(x, y);
+        double dV = voronoi_.distanceToNearestEdge(x, y);
+
+        double cost = (alpha / (alpha + dO)) * (dV / (dO + dV)) *
+                      ((dO - dO_max) * (dO - dO_max) / (dO_max * dO_max));
+        cost = cost * 100;
+
+        costmap.data[idx] = cost;
       }
     }
 

@@ -1,25 +1,30 @@
 #include "voronoi/VoronoiImage.h"
 #include "voronoi/Pixel.h"
 
+#include <algorithm>
 #include <cmath>
 #include <limits>
 
 namespace voronoi {
 
 void VoronoiImage::setGrid(nav_msgs::msg::OccupancyGrid::SharedPtr map) {
+  max_dist2_ = 0;
   width_ = map->info.width;
   height_ = map->info.height;
-  image_ = map;
+  grid_ = map;
   dsu.init(width_ * height_);
-  feature_vector_.resize(width_ * height_);
+  obstacle_feature_vector_.resize(width_ * height_);
+  edge_feature_vector_.resize(width_ * height_);
 }
 
 void VoronoiImage::ComputeFT() {
-  ComputeF0();
+  ComputeF0(grid_->data, obstacle_feature_vector_, true);
   for (int x = 0; x < width_; x++)
-    ComputeF1(x);
+    ComputeF1(obstacle_feature_vector_, x);
   for (int y = 0; y < height_; y++)
-    ComputeF2(y);
+    ComputeF2(obstacle_feature_vector_, y);
+
+  std::fill(grid_->data.begin(), grid_->data.end(), 0);
 
   const int dx[4] = {1, -1, 0, 0};
   const int dy[4] = {0, 0, 1, -1};
@@ -27,10 +32,14 @@ void VoronoiImage::ComputeFT() {
   for (int y = 0; y < height_; y++) {
     for (int x = 0; x < width_; x++) {
       int idx = getIndex(x, y);
-      if (image_->data[idx] == 100)
+      if (grid_->data[idx] == 100)
         continue;
-      int root =
-          dsu.find(getIndex(feature_vector_[idx].x, feature_vector_[idx].y));
+
+      max_dist2_ = std::max(max_dist2_,
+                            dist2(Pixel(x, y), obstacle_feature_vector_[idx]));
+
+      int root = dsu.find(getIndex(obstacle_feature_vector_[idx].x,
+                                   obstacle_feature_vector_[idx].y));
 
       for (int i = 0; i < 4; i++) {
         int new_x = x + dx[i];
@@ -40,41 +49,48 @@ void VoronoiImage::ComputeFT() {
 
         int new_idx = getIndex(new_x, new_y);
 
-        if (image_->data[new_idx] == 100)
+        if (grid_->data[new_idx] == 100)
           continue;
 
-        int new_root = dsu.find(
-            getIndex(feature_vector_[new_idx].x, feature_vector_[new_idx].y));
+        int new_root = dsu.find(getIndex(obstacle_feature_vector_[new_idx].x,
+                                         obstacle_feature_vector_[new_idx].y));
 
         if (root != new_root && idx < new_idx) {
-          feature_vector_[idx].is_edge = true;
-          // enter into kd tree as its an edge
+          grid_->data[idx] = 100;
         }
       }
     }
   }
-}
 
-bool VoronoiImage::isEdge(int x, int y) {
-  if (!isValid(x, y))
-    return false;
-
-  int idx = getIndex(x, y);
-  return feature_vector_[idx].is_edge;
+  ComputeF0(grid_->data, edge_feature_vector_);
+  for (int x = 0; x < width_; x++)
+    ComputeF1(edge_feature_vector_, x);
+  for (int y = 0; y < height_; y++)
+    ComputeF2(edge_feature_vector_, y);
 }
 
 double VoronoiImage::distanceToNearestObstacle(int x, int y) {
   if (!isValid(x, y))
     return std::numeric_limits<double>::max();
 
-  Pixel nearest = feature_vector_[getIndex(x, y)];
+  Pixel nearest = obstacle_feature_vector_[getIndex(x, y)];
   return std::sqrt(dist2(Pixel(x, y), nearest));
 }
 
+double VoronoiImage::distanceToNearestEdge(int x, int y) {
+  if (!isValid(x, y))
+    return std::numeric_limits<double>::max();
+
+  Pixel nearest = edge_feature_vector_[getIndex(x, y)];
+  return std::sqrt(dist2(Pixel(x, y), nearest));
+}
+
+double VoronoiImage::getMaxDist() { return std::sqrt(max_dist2_); }
+
 int VoronoiImage::getIndex(int x, int y) { return y * width_ + x; }
 
-bool VoronoiImage::isBoundary(int x, int y) {
-  if (image_->data[getIndex(x, y)] != 100)
+bool VoronoiImage::isBoundary(std::vector<int8_t> &image_, int x, int y) {
+  if (image_[getIndex(x, y)] != 100)
     return false;
 
   for (int dy = -1; dy <= 1; ++dy) {
@@ -89,7 +105,7 @@ bool VoronoiImage::isBoundary(int x, int y) {
       if (nx < 0 || ny < 0 || nx >= width_ || ny >= height_)
         return true;
 
-      if (image_->data[getIndex(nx, ny)] != 100)
+      if (image_[getIndex(nx, ny)] != 100)
         return true;
     }
   }
@@ -107,27 +123,35 @@ long long VoronoiImage::dist2(const Pixel &a, const Pixel &b) {
   return dx * dx + dy * dy;
 }
 
-void VoronoiImage::ComputeF0() {
+void VoronoiImage::ComputeF0(std::vector<int8_t> &image_,
+                             std::vector<Pixel> &feature_vector_,
+                             bool compute_dsu) {
   const int dx[4] = {1, -1, 0, 1};
   const int dy[4] = {0, -1, -1, -1};
 
   for (int y = 0; y < height_; y++) {
     for (int x = 0; x < width_; x++) {
       int idx = getIndex(x, y);
-      if (isBoundary(x, y))
+      if (isBoundary(image_, x, y))
         feature_vector_[idx] = Pixel(x, y);
       else
         feature_vector_[idx] = UNDEFINED;
 
-      if (image_->data[idx] != 100)
+      if (!compute_dsu)
+        continue;
+
+      if (image_[idx] != 100)
         continue;
 
       for (int i = 0; i < 4; i++) {
         int new_x = x + dx[i];
         int new_y = y + dy[i];
+        if (!isValid(new_x, new_y))
+          continue;
+
         int new_idx = getIndex(new_x, new_y);
 
-        if (!isValid(new_x, new_y) || image_->data[new_idx] != 100)
+        if (image_[new_idx] != 100)
           continue;
 
         dsu.unite(idx, new_idx);
@@ -136,7 +160,7 @@ void VoronoiImage::ComputeF0() {
   }
 }
 
-void VoronoiImage::ComputeF1(int x) {
+void VoronoiImage::ComputeF1(std::vector<Pixel> &feature_vector_, int x) {
   std::vector<Pixel> g;
   for (int y = 0; y < height_; y++) {
     Pixel f = feature_vector_[getIndex(x, y)];
@@ -162,7 +186,7 @@ void VoronoiImage::ComputeF1(int x) {
   }
 }
 
-void VoronoiImage::ComputeF2(int y) {
+void VoronoiImage::ComputeF2(std::vector<Pixel> &feature_vector_, int y) {
   std::vector<Pixel> g;
   for (int x = 0; x < width_; x++) {
     Pixel f = feature_vector_[getIndex(x, y)];
@@ -221,5 +245,4 @@ bool VoronoiImage::RemoveF2(const Pixel &u, const Pixel &v, const Pixel &w,
 
   return (c * dv - b * du - a * dw - a * b * c) > 0;
 }
-}
-; // namespace voronoi
+}; // namespace voronoi
