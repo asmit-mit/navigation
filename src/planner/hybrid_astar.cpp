@@ -19,15 +19,14 @@ HybridAStar::HybridAStar(nav_msgs::msg::OccupancyGrid::SharedPtr grid)
 
 void HybridAStar::setGoal(double x, double y, double theta) {
   end_ = Pose(x, y, theta);
+  preprocess();
 }
 
 void HybridAStar::setStart(double x, double y, double theta) {
   start_ = Pose(x, y, theta);
 }
 
-std::vector<Pose> HybridAStar::getPlan() {
-  return {};
-}
+std::vector<Pose> HybridAStar::getPlan() { return {}; }
 
 bool HybridAStar::isValid(int x, int y) {
   return x >= 0 && y >= 0 && x < width_ && y < height_ &&
@@ -36,16 +35,28 @@ bool HybridAStar::isValid(int x, int y) {
 
 int HybridAStar::getIndex(int x, int y) { return y * width_ + x; }
 
-std::pair<int, int> HybridAStar::worldToMap(double x, double y) {
+std::pair<int, int> HybridAStar::worldToMapDiscrete(double x, double y) {
   int gx = floor((x - grid_->info.origin.position.x) / resolution_);
   int gy = floor((y - grid_->info.origin.position.y) / resolution_);
   return {gx, gy};
 }
 
+std::pair<double, double> HybridAStar::worldToMapContinous(double x, double y) {
+  int gx = (x - grid_->info.origin.position.x) / resolution_;
+  int gy = (y - grid_->info.origin.position.y) / resolution_;
+  return {gx, gy};
+}
+
+std::pair<double, double> HybridAStar::mapToWorld(double x, double y) {
+  int wx = x * resolution_ + grid_->info.origin.position.x;
+  int wy = y * resolution_ + grid_->info.origin.position.y;
+  return {wx, wy};
+}
+
 void HybridAStar::preprocess() {
   holonomic_with_obstacle_cost.assign(height_ * width_,
-                                      std::numeric_limits<double>::max());
-  auto [start_x, start_y] = worldToMap(end_.x, end_.y);
+                                      std::numeric_limits<double>::infinity());
+  auto [start_x, start_y] = worldToMapDiscrete(end_.x, end_.y);
   if (!isValid(start_x, start_y))
     return;
 
@@ -90,6 +101,24 @@ void HybridAStar::preprocess() {
       }
     }
   }
+}
+
+double HybridAStar::distance(const Pose &a, const Pose &b) {
+  double dx = a.x - b.x;
+  double dy = a.y - b.y;
+  return std::hypot(dx, dy);
+}
+
+double HybridAStar::heuristic(const Node *a) {
+  auto [x, y] = mapToWorld(a->x, a->y);
+  Pose start(x, y, a->theta);
+
+  double h_rs = reed_shepps_.getOptimalPath(start, end_);
+  double h_2d = distance(start, end_);
+
+  double h1 = std::max(h_rs, h_2d);
+  double h2 = holonomic_with_obstacle_cost[getIndex(a->grid_x, a->grid_y)];
+  return std::max(h1, h2);
 }
 
 }; // namespace planner

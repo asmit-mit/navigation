@@ -4,7 +4,7 @@ namespace planner {
 
 struct Node {
   double x, y, theta;
-  double g_cost, h_cost, f_cost;
+  double g_cost, h_cost;
   double v, omega;
 
   int grid_x, grid_y, theta_bin;

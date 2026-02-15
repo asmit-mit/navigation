@@ -20,10 +20,15 @@ public:
   std::vector<Pose> getPlan();
 
 private:
+  std::pair<int, int> worldToMapDiscrete(double x, double y);
+  std::pair<double, double> worldToMapContinous(double x, double y);
+  std::pair<double, double> mapToWorld(double x, double y);
+
   bool isValid(int x, int y);
   int getIndex(int x, int y);
-  std::pair<int, int> worldToMap(double x, double y);
   void preprocess();
+  double distance(const Pose &a, const Pose &b);
+  double heuristic(const Node *a);
 
 private:
   double resolution_;
