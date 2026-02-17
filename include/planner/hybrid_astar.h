@@ -16,6 +16,7 @@ public:
 
   void setTolerance(double angle, double distance);
   void setAngularResolution(double angle);
+  void setVelocities(double linear, double angluar);
   void setStart(double x, double y, double theta);
   void setGoal(double x, double y, double theta);
   std::vector<Pose> getPlan();
@@ -60,10 +61,14 @@ private:
   void preprocess();
   double distance(const Pose &a, const Pose &b);
   double heuristic(const Node *a);
+  bool goalReached(const Node *node);
+  std::vector<Pose> expand(const Pose &p);
 
 private:
-  double angle_resolution_, distance_resolution_;
-  double angle_tolerance_, distance_tolerance_;
+  double angular_resolution_, distance_resolution_;
+  double angular_tolerance_, distance_tolerance_;
+  double max_linear_velocity_, max_angular_velocity_;
+
   int height_, width_;
   Pose start_, end_;
 

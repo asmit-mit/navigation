@@ -24,7 +24,7 @@ void ReedShepps::setMinTurningRadius(double min_turning_radius_) {
   this->min_turning_radius_ = min_turning_radius_;
 }
 
-double ReedShepps::getOptimalPath(Pose &start, Pose &end) {
+double ReedShepps::getOptimalPath(const Pose &start, const Pose &end) {
   double min_dist = std::numeric_limits<double>::infinity();
 
   Pose relative = changeOfBasis(start, end);
@@ -50,7 +50,7 @@ std::pair<double, double> ReedShepps::R(double x, double y) {
   return {r, theta};
 }
 
-Pose ReedShepps::changeOfBasis(Pose &p1, Pose &p2) {
+Pose ReedShepps::changeOfBasis(const Pose &p1, const Pose &p2) {
   double theta1 = p1.theta;
   double dx = p2.x - p1.x;
   double dy = p2.y - p1.y;

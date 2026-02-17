@@ -22,12 +22,12 @@ public:
   ReedShepps();
 
   void setMinTurningRadius(double min_turning_radius_);
-  double getOptimalPath(Pose &start, Pose &end);
+  double getOptimalPath(const Pose &start, const Pose &end);
 
 private:
   double M(double theta);
   std::pair<double, double> R(double x, double y);
-  Pose changeOfBasis(Pose &p1, Pose &p2);
+  Pose changeOfBasis(const Pose &p1, const Pose &p2);
   double rad2deg(double rad);
   double deg2rad(double deg);
   int sign(int x);

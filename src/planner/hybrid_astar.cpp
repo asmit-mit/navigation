@@ -39,18 +39,23 @@ HybridAStar::HybridAStar(nav_msgs::msg::OccupancyGrid::SharedPtr grid)
   width_ = grid->info.width;
   distance_resolution_ = grid->info.resolution;
 
-  reed_shepps_.setMinTurningRadius(1);
   voronoi_.setGrid(grid_);
   voronoi_.ComputeFT();
 }
 
 void HybridAStar::setTolerance(double angle, double distance) {
-  angle_tolerance_ = angle;
+  angular_tolerance_ = angle;
   distance_tolerance_ = distance;
 }
 
 void HybridAStar::setAngularResolution(double angle) {
-  angle_resolution_ = angle;
+  angular_resolution_ = angle;
+}
+
+void HybridAStar::setVelocities(double linear, double angular) {
+  max_linear_velocity_ = linear;
+  max_angular_velocity_ = angular;
+  reed_shepps_.setMinTurningRadius(linear / angular);
 }
 
 void HybridAStar::setGoal(double x, double y, double theta) {
@@ -64,7 +69,7 @@ void HybridAStar::setStart(double x, double y, double theta) {
 
 std::vector<Pose> HybridAStar::getPlan() {
   Node *start = new Node(start_, this);
-  Node *end = new Node(end_, this);
+  start->h_cost = heuristic(start);
 
   open.push(start);
   closed[start] = 0;
@@ -73,16 +78,45 @@ std::vector<Pose> HybridAStar::getPlan() {
     Node *curr = open.top();
     open.pop();
 
-    if (curr->g_cost >= closed[curr])
+    auto it_curr = closed.find(curr);
+    if (it_curr != closed.end() && curr->g_cost > it_curr->second)
       continue;
 
-    if (start->state == end->state) {
-      // reconstruct path and return
+    if (goalReached(curr)) {
+      // reconstruct path;
       return {};
     }
 
+    // add analytical expansion here
 
+    std::vector<Pose> neighbors = expand(curr->pose);
+
+    for (Pose &nbr : neighbors) {
+      Node *next = new Node(nbr, this);
+
+      if (!isValid(next->state.grid_x, next->state.grid_y)) {
+        delete next;
+        continue;
+      }
+
+      double new_g = curr->g_cost + distance(curr->pose, nbr);
+
+      auto it_next = closed.find(next);
+      if (it_next != closed.end() && new_g >= it_next->second) {
+        delete next;
+        continue;
+      }
+
+      closed[next] = new_g;
+      next->g_cost = new_g;
+      next->h_cost = heuristic(next);
+      next->parent = curr;
+
+      open.push(next);
+    }
   }
+
+  delete start;
 
   return {};
 }
@@ -121,7 +155,7 @@ State HybridAStar::poseToState(const Pose &p) {
   if (theta_deg < 0.0)
     theta_deg += 360.0;
 
-  int theta_bin = static_cast<int>(std::floor(theta_deg / angle_resolution_));
+  int theta_bin = static_cast<int>(std::floor(theta_deg / angular_resolution_));
 
   return State(x, y, theta_bin);
 }
@@ -183,17 +217,51 @@ double HybridAStar::distance(const Pose &a, const Pose &b) {
   return std::hypot(dx, dy);
 }
 
-double HybridAStar::heuristic(const Node *a) {
-  auto [x, y] = mapToWorld(a->pose.x, a->pose.y);
-  Pose start(x, y, a->pose.theta);
-
-  double h_rs = reed_shepps_.getOptimalPath(start, end_);
-  double h_2d = distance(start, end_);
+double HybridAStar::heuristic(const Node *node) {
+  double h_rs = reed_shepps_.getOptimalPath(node->pose, end_);
+  double h_2d = distance(node->pose, end_);
 
   double h1 = std::max(h_rs, h_2d);
   double h2 =
-      holonomic_with_obstacle_cost[getIndex(a->state.grid_x, a->state.grid_y)];
+      holonomic_with_obstacle_cost[getIndex(node->state.grid_x, node->state.grid_y)];
   return std::max(h1, h2);
+}
+
+bool HybridAStar::goalReached(const Node *node) {
+  double dtheta = std::atan2(std::sin(node->pose.theta - end_.theta),
+                             std::cos(node->pose.theta - end_.theta));
+
+  return (distance(node->pose, end_) < distance_tolerance_ &&
+          std::abs(dtheta) < angular_tolerance_);
+}
+
+std::vector<Pose> HybridAStar::expand(const Pose &p) {
+  std::vector<Pose> neighbors;
+
+  double r_min = max_linear_velocity_ / max_angular_velocity_;
+  double step = 0.15 * r_min;
+
+  std::vector<std::pair<double, double>> controls = {
+      {max_linear_velocity_, 0.0},
+      {max_linear_velocity_, max_angular_velocity_},
+      {max_linear_velocity_, -max_angular_velocity_},
+      {-max_linear_velocity_, 0.0},
+      {-max_linear_velocity_, max_angular_velocity_},
+      {-max_linear_velocity_, -max_angular_velocity_},
+  };
+
+  for (auto [u, omega] : controls) {
+    double dt = step / std::abs(u);
+
+    double x_new = p.x + u * std::cos(p.theta) * dt;
+    double y_new = p.y + u * std::sin(p.theta) * dt;
+    double theta_new = p.theta + omega * dt;
+    theta_new = std::atan2(std::sin(theta_new), std::cos(theta_new));
+
+    neighbors.emplace_back(x_new, y_new, theta_new);
+  }
+
+  return neighbors;
 }
 
 }; // namespace planner
