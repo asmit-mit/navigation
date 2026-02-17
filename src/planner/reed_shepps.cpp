@@ -51,7 +51,7 @@ std::pair<double, double> ReedShepps::R(double x, double y) {
 }
 
 Pose ReedShepps::changeOfBasis(Pose &p1, Pose &p2) {
-  double theta1 = deg2rad(p1.theta);
+  double theta1 = p1.theta;
   double dx = p2.x - p1.x;
   double dy = p2.y - p1.y;
 
@@ -71,7 +71,7 @@ int ReedShepps::sign(int x) { return (x >= 0) ? 1 : -1; }
 double ReedShepps::getAllPaths() { return 0; }
 
 double ReedShepps::path1(const Pose &p) {
-  double phi = deg2rad(p.theta);
+  double phi = p.theta;
   auto [u, t] = R(p.x - std::sin(phi), p.y - 1 + std::cos(phi));
   double v = M(phi - t);
 
@@ -79,7 +79,7 @@ double ReedShepps::path1(const Pose &p) {
 }
 
 double ReedShepps::path2(const Pose &p) {
-  double phi = M(deg2rad(p.theta));
+  double phi = M(p.theta);
   auto [rho, t1] = R(p.x + std::sin(phi), p.y - 1 - std::cos(phi));
 
   if (rho * rho < 4)
@@ -93,7 +93,7 @@ double ReedShepps::path2(const Pose &p) {
 }
 
 double ReedShepps::path3(const Pose &p) {
-  double phi = deg2rad(p.theta);
+  double phi = p.theta;
   double x1 = p.x - std::sin(phi);
   double eta = p.y - 1 + std::cos(phi);
   auto [rho, theta] = R(x1, eta);
@@ -110,7 +110,7 @@ double ReedShepps::path3(const Pose &p) {
 }
 
 double ReedShepps::path4(const Pose &p) {
-  double phi = deg2rad(p.theta);
+  double phi = p.theta;
   double x1 = p.x - std::sin(phi);
   double eta = p.y - 1 + std::cos(phi);
   auto [rho, theta] = R(x1, eta);
@@ -127,7 +127,7 @@ double ReedShepps::path4(const Pose &p) {
 }
 
 double ReedShepps::path5(const Pose &p) {
-  double phi = deg2rad(p.theta);
+  double phi = p.theta;
   double x1 = p.x - std::sin(phi);
   double eta = p.y - 1 + std::cos(phi);
   auto [rho, theta] = R(x1, eta);
@@ -144,7 +144,7 @@ double ReedShepps::path5(const Pose &p) {
 }
 
 double ReedShepps::path6(const Pose &p) {
-  double phi = deg2rad(p.theta);
+  double phi = p.theta;
   double x1 = p.x + std::sin(phi);
   double eta = p.y - 1 - std::cos(phi);
   auto [rho, theta] = R(x1, eta);
@@ -169,7 +169,7 @@ double ReedShepps::path6(const Pose &p) {
 }
 
 double ReedShepps::path7(const Pose &p) {
-  double phi = deg2rad(p.theta);
+  double phi = p.theta;
   double xi = p.x + std::sin(phi);
   double eta = p.y - 1 - std::cos(phi);
   auto [rho, theta] = R(xi, eta);
@@ -188,7 +188,7 @@ double ReedShepps::path7(const Pose &p) {
 }
 
 double ReedShepps::path8(const Pose &p) {
-  double phi = deg2rad(p.theta);
+  double phi = p.theta;
   double xi = p.x - std::sin(phi);
   double eta = p.y - 1 + std::cos(phi);
   auto [rho, theta] = R(xi, eta);
@@ -205,7 +205,7 @@ double ReedShepps::path8(const Pose &p) {
 }
 
 double ReedShepps::path9(const Pose &p) {
-  double phi = deg2rad(p.theta);
+  double phi = p.theta;
   double xi = p.x - std::sin(phi);
   double eta = p.y - 1 + std::cos(phi);
 
@@ -223,7 +223,7 @@ double ReedShepps::path9(const Pose &p) {
 }
 
 double ReedShepps::path10(const Pose &p) {
-  double phi = deg2rad(p.theta);
+  double phi = p.theta;
   double xi = p.x + std::sin(phi);
   double eta = p.y - 1 - std::cos(phi);
   auto [rho, theta] = R(xi, eta);
@@ -239,7 +239,7 @@ double ReedShepps::path10(const Pose &p) {
 }
 
 double ReedShepps::path11(const Pose &p) {
-  double phi = deg2rad(p.theta);
+  double phi = p.theta;
   double xi = p.x + std::sin(phi);
   double eta = p.y - 1 - std::cos(phi);
 
@@ -256,7 +256,7 @@ double ReedShepps::path11(const Pose &p) {
 }
 
 double ReedShepps::path12(const Pose &p) {
-  double phi = deg2rad(p.theta);
+  double phi = p.theta;
   double xi = p.x + std::sin(phi);
   double eta = p.y - 1 - std::cos(phi);
 

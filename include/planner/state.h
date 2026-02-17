@@ -8,6 +8,7 @@ struct State {
   int grid_y;
   int theta_bin;
 
+  State();
   State(int grid_x, int grid_y, int theta_bin);
   bool operator==(const State &other) const;
 };
