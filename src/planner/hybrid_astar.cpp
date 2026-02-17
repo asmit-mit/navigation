@@ -1,7 +1,7 @@
 #include "planner/hybrid_astar.h"
 
 #include <cmath>
-#include <cstddef>
+#include <iostream>
 #include <limits>
 #include <queue>
 
@@ -25,11 +25,11 @@ bool HybridAStar::CompareNode::operator()(Node *a, Node *b) {
   return (a->g_cost + a->h_cost) > (b->g_cost + b->h_cost);
 }
 
-std::size_t HybridAStar::NodeHash::operator()(Node *node) {
+std::size_t HybridAStar::NodeHash::operator()(Node *node) const {
   return StateHash()(node->state);
 }
 
-bool HybridAStar::NodeEqual::operator()(Node *a, Node *b) {
+bool HybridAStar::NodeEqual::operator()(Node *a, Node *b) const {
   return a->state == b->state;
 }
 
@@ -69,29 +69,43 @@ void HybridAStar::setStart(double x, double y, double theta) {
 
 std::vector<Pose> HybridAStar::getPlan() {
   Node *start = new Node(start_, this);
+  nodes.push_back(start);
   start->h_cost = heuristic(start);
 
+  std::priority_queue<Node *, std::vector<Node *>, CompareNode> open;
+  std::unordered_set<Node *, NodeHash, NodeEqual> closed;
   open.push(start);
-  closed[start] = 0;
+
+  int count = 0;
 
   while (!open.empty()) {
+    if (count > 10000)
+      break;
+
     Node *curr = open.top();
     open.pop();
 
-    auto it_curr = closed.find(curr);
-    if (it_curr != closed.end() && curr->g_cost > it_curr->second)
-      continue;
-
     if (goalReached(curr)) {
-      // reconstruct path;
-      return {};
+      std::vector<Pose> path;
+      while (curr->parent) {
+        path.push_back(curr->pose);
+        curr = curr->parent;
+      }
+      std::reverse(path.begin(), path.end());
+      freeNodes();
+      return path;
     }
+
+    auto it_curr = closed.find(curr);
+    if (it_curr != closed.end())
+      continue;
+    closed.insert(curr);
 
     // add analytical expansion here
 
-    std::vector<Pose> neighbors = expand(curr->pose);
+    std::vector<std::pair<Pose, double>> neighbors = expand(curr->pose);
 
-    for (Pose &nbr : neighbors) {
+    for (auto [nbr, cost] : neighbors) {
       Node *next = new Node(nbr, this);
 
       if (!isValid(next->state.grid_x, next->state.grid_y)) {
@@ -99,24 +113,18 @@ std::vector<Pose> HybridAStar::getPlan() {
         continue;
       }
 
-      double new_g = curr->g_cost + distance(curr->pose, nbr);
-
-      auto it_next = closed.find(next);
-      if (it_next != closed.end() && new_g >= it_next->second) {
-        delete next;
-        continue;
-      }
-
-      closed[next] = new_g;
-      next->g_cost = new_g;
+      next->g_cost = curr->g_cost + cost;
       next->h_cost = heuristic(next);
       next->parent = curr;
 
       open.push(next);
+      nodes.push_back(next);
     }
+
+    count++;
   }
 
-  delete start;
+  freeNodes();
 
   return {};
 }
@@ -222,8 +230,8 @@ double HybridAStar::heuristic(const Node *node) {
   double h_2d = distance(node->pose, end_);
 
   double h1 = std::max(h_rs, h_2d);
-  double h2 =
-      holonomic_with_obstacle_cost[getIndex(node->state.grid_x, node->state.grid_y)];
+  double h2 = holonomic_with_obstacle_cost[getIndex(node->state.grid_x,
+                                                    node->state.grid_y)];
   return std::max(h1, h2);
 }
 
@@ -235,11 +243,14 @@ bool HybridAStar::goalReached(const Node *node) {
           std::abs(dtheta) < angular_tolerance_);
 }
 
-std::vector<Pose> HybridAStar::expand(const Pose &p) {
-  std::vector<Pose> neighbors;
+std::vector<std::pair<Pose, double>> HybridAStar::expand(const Pose &p) {
+  std::vector<std::pair<Pose, double>> neighbors;
 
-  double r_min = max_linear_velocity_ / max_angular_velocity_;
-  double step = 0.15 * r_min;
+  double step = distance_resolution_;
+  double sample_resolution = distance_resolution_ * 0.5;
+
+  double penalty_steering = 1.05;
+  double penalty_reverse = 3.0;
 
   std::vector<std::pair<double, double>> controls = {
       {max_linear_velocity_, 0.0},
@@ -251,17 +262,47 @@ std::vector<Pose> HybridAStar::expand(const Pose &p) {
   };
 
   for (auto [u, omega] : controls) {
-    double dt = step / std::abs(u);
+    double arc_length = step;
+    double dt_total = arc_length / std::abs(u);
 
-    double x_new = p.x + u * std::cos(p.theta) * dt;
-    double y_new = p.y + u * std::sin(p.theta) * dt;
-    double theta_new = p.theta + omega * dt;
-    theta_new = std::atan2(std::sin(theta_new), std::cos(theta_new));
+    int num_samples = std::ceil(arc_length / sample_resolution);
+    double dt = dt_total / num_samples;
 
-    neighbors.emplace_back(x_new, y_new, theta_new);
+    Pose temp = p;
+    bool collision = false;
+
+    for (int i = 0; i < num_samples; i++) {
+      temp.x += u * std::cos(temp.theta) * dt;
+      temp.y += u * std::sin(temp.theta) * dt;
+      temp.theta += omega * dt;
+      temp.theta = std::atan2(std::sin(temp.theta), std::cos(temp.theta));
+
+      auto [gx, gy] = worldToMapDiscrete(temp.x, temp.y);
+      if (!isValid(gx, gy)) {
+        collision = true;
+        break;
+      }
+    }
+
+    if (!collision) {
+      double cost = arc_length;
+
+      if (std::abs(omega) > 1e-6)
+        cost *= penalty_steering;
+
+      if (u < 0.0)
+        cost *= penalty_reverse;
+
+      neighbors.emplace_back(temp, cost);
+    }
   }
-
   return neighbors;
+}
+
+void HybridAStar::freeNodes() {
+  for (int i = 0; i < (int)nodes.size(); i++) {
+    delete nodes[i];
+  }
 }
 
 }; // namespace planner

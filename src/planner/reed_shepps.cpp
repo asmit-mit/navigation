@@ -8,6 +8,8 @@
 
 namespace planner {
 
+ReedShepps::ReedShepps() {}
+
 double ReedShepps::M(double theta) {
   theta = std::fmod(theta, 2 * M_PI);
 

@@ -1,6 +1,6 @@
 #include <nav_msgs/msg/detail/occupancy_grid__struct.hpp>
 #include <queue>
-#include <unordered_map>
+#include <unordered_set>
 #include <vector>
 
 #include "planner/pose.h"
@@ -42,11 +42,11 @@ private:
   };
 
   struct NodeHash {
-    std::size_t operator()(Node *node);
+    std::size_t operator()(Node *node) const;
   };
 
   struct NodeEqual {
-    bool operator()(Node *a, Node *b);
+    bool operator()(Node *a, Node *b) const;
   };
 
 private:
@@ -62,7 +62,9 @@ private:
   double distance(const Pose &a, const Pose &b);
   double heuristic(const Node *a);
   bool goalReached(const Node *node);
-  std::vector<Pose> expand(const Pose &p);
+  std::vector<std::pair<Pose, double>> expand(const Pose &p);
+
+  void freeNodes();
 
 private:
   double angular_resolution_, distance_resolution_;
@@ -74,11 +76,10 @@ private:
 
   nav_msgs::msg::OccupancyGrid::SharedPtr grid_;
   voronoi::VoronoiImage voronoi_;
-  std::priority_queue<Node *, std::vector<Node *>, CompareNode> open;
-  std::unordered_map<Node *, double, NodeHash, NodeEqual> closed;
   ReedShepps reed_shepps_;
-
   std::vector<double> holonomic_with_obstacle_cost;
+
+  std::vector<Node *> nodes;
 
   friend class Node;
 };
