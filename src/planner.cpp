@@ -1,15 +1,14 @@
 #include <chrono>
 #include <functional>
 #include <memory>
-#include <tf2/LinearMath/Matrix3x3.hpp>
-#include <tf2/convert.hpp>
 #include <vector>
 
 #include "geometry_msgs/msg/pose_stamped.hpp"
 #include "nav_msgs/msg/occupancy_grid.hpp"
-#include "nav_msgs/msg/odometry.hpp"
 #include "nav_msgs/msg/path.hpp"
 #include "rclcpp/rclcpp.hpp"
+
+#include "tf2/LinearMath/Matrix3x3.hpp"
 #include "tf2/LinearMath/Quaternion.h"
 #include "tf2_geometry_msgs/tf2_geometry_msgs.hpp"
 
@@ -29,9 +28,6 @@ public:
     map_sub_ = this->create_subscription<nav_msgs::msg::OccupancyGrid>(
         "/map", map_qos, std::bind(&Planner::mapCallback, this, _1));
 
-    odom_sub_ = this->create_subscription<nav_msgs::msg::Odometry>(
-        "/odom", 10, std::bind(&Planner::odomCallback, this, _1));
-
     goal_sub_ = this->create_subscription<geometry_msgs::msg::PoseStamped>(
         "/goal_pose", 10, std::bind(&Planner::goalCallback, this, _1));
 
@@ -49,45 +45,57 @@ private:
     latest_map_ = msg;
   }
 
-  void odomCallback(const nav_msgs::msg::Odometry::SharedPtr msg) {
-    latest_odom_ = msg;
-  }
-
   void goalCallback(const geometry_msgs::msg::PoseStamped::SharedPtr msg) {
-    latest_goal_ = msg;
-    RCLCPP_INFO(this->get_logger(), "Goal received");
+
+    if (!have_start_) {
+      start_pose_ = msg;
+      have_start_ = true;
+      RCLCPP_INFO(this->get_logger(), "Start pose received");
+      return;
+    }
+
+    if (!have_goal_) {
+      goal_pose_ = msg;
+      have_goal_ = true;
+      RCLCPP_INFO(this->get_logger(), "Goal pose received");
+      return;
+    }
+
+    start_pose_ = goal_pose_;
+    goal_pose_ = msg;
+
+    RCLCPP_INFO(this->get_logger(), "Updated start and goal");
   }
 
   void timerCallback() {
-    if (!latest_map_ || !latest_odom_ || !latest_goal_)
+
+    if (!latest_map_ || !have_start_ || !have_goal_)
       return;
 
-    double start_x = latest_odom_->pose.pose.position.x;
-    double start_y = latest_odom_->pose.pose.position.y;
+    double start_x = start_pose_->pose.position.x;
+    double start_y = start_pose_->pose.position.y;
 
     tf2::Quaternion q_start;
-    tf2::fromMsg(latest_odom_->pose.pose.orientation, q_start);
+    tf2::fromMsg(start_pose_->pose.orientation, q_start);
     double roll, pitch, start_theta;
     tf2::Matrix3x3(q_start).getRPY(roll, pitch, start_theta);
 
-    double goal_x = latest_goal_->pose.position.x;
-    double goal_y = latest_goal_->pose.position.y;
+    double goal_x = goal_pose_->pose.position.x;
+    double goal_y = goal_pose_->pose.position.y;
 
     tf2::Quaternion q_goal;
-    tf2::fromMsg(latest_goal_->pose.orientation, q_goal);
+    tf2::fromMsg(goal_pose_->pose.orientation, q_goal);
     double goal_theta;
     tf2::Matrix3x3(q_goal).getRPY(roll, pitch, goal_theta);
 
     planner::HybridAStar planner(latest_map_);
-
-    planner.setVelocities(0.1, 1.0);
-    planner.setTolerance(0.5, 0.5);
+    planner.setVelocities(0.2, 0.5);
+    planner.setTolerance(0.5, 0.2);
     planner.setStart(start_x, start_y, start_theta);
     planner.setGoal(goal_x, goal_y, goal_theta);
     planner.setAngularResolution(5);
 
     std::vector<planner::Pose> path = planner.getPlan();
-    std::cout << path.front().x << path.front().y << std::endl;
 
     if (path.empty()) {
       RCLCPP_WARN(this->get_logger(), "No path found");
@@ -109,7 +117,6 @@ private:
 
       tf2::Quaternion q;
       q.setRPY(0, 0, pose.theta);
-
       pose_stamped.pose.orientation = tf2::toMsg(q);
 
       ros_path.poses.push_back(pose_stamped);
@@ -125,14 +132,17 @@ private:
   rclcpp::TimerBase::SharedPtr timer_;
 
   rclcpp::Subscription<nav_msgs::msg::OccupancyGrid>::SharedPtr map_sub_;
-  rclcpp::Subscription<nav_msgs::msg::Odometry>::SharedPtr odom_sub_;
   rclcpp::Subscription<geometry_msgs::msg::PoseStamped>::SharedPtr goal_sub_;
 
   rclcpp::Publisher<nav_msgs::msg::Path>::SharedPtr path_pub_;
 
   nav_msgs::msg::OccupancyGrid::SharedPtr latest_map_;
-  nav_msgs::msg::Odometry::SharedPtr latest_odom_;
-  geometry_msgs::msg::PoseStamped::SharedPtr latest_goal_;
+
+  geometry_msgs::msg::PoseStamped::SharedPtr start_pose_;
+  geometry_msgs::msg::PoseStamped::SharedPtr goal_pose_;
+
+  bool have_start_ = false;
+  bool have_goal_ = false;
 };
 
 int main(int argc, char *argv[]) {

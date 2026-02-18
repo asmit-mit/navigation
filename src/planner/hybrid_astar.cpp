@@ -1,7 +1,6 @@
 #include "planner/hybrid_astar.h"
 
 #include <cmath>
-#include <iostream>
 #include <limits>
 #include <queue>
 
@@ -55,7 +54,7 @@ void HybridAStar::setAngularResolution(double angle) {
 void HybridAStar::setVelocities(double linear, double angular) {
   max_linear_velocity_ = linear;
   max_angular_velocity_ = angular;
-  reed_shepps_.setMinTurningRadius(linear / angular);
+  reed_shepps_.setMinTurningRadius(0.2);
 }
 
 void HybridAStar::setGoal(double x, double y, double theta) {
@@ -79,9 +78,6 @@ std::vector<Pose> HybridAStar::getPlan() {
   int count = 0;
 
   while (!open.empty()) {
-    if (count > 10000)
-      break;
-
     Node *curr = open.top();
     open.pop();
 
@@ -122,6 +118,8 @@ std::vector<Pose> HybridAStar::getPlan() {
     }
 
     count++;
+    if (count > 50000)
+      break;
   }
 
   freeNodes();
