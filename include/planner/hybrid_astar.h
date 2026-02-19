@@ -66,6 +66,7 @@ private:
   void freeNodes();
 
 private:
+  double map_resolution_;
   double angular_resolution_, distance_resolution_;
   double angular_tolerance_, distance_tolerance_;
   double max_linear_velocity_, max_angular_velocity_;

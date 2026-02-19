@@ -93,7 +93,7 @@ private:
     tf2::Matrix3x3(q_goal).getRPY(roll, pitch, goal_theta);
 
     planner::HybridAStar planner(latest_map_);
-    planner.setVelocities(0.2, 0.5);
+    planner.setVelocities(0.5, 0.5);
     planner.setTolerance(0.5, 0.2);
     planner.setStart(start_x, start_y, start_theta);
     planner.setGoal(goal_x, goal_y, goal_theta);

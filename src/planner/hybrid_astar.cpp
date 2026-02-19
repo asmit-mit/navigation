@@ -1,6 +1,7 @@
 #include "planner/hybrid_astar.h"
 
 #include <cmath>
+#include <iostream>
 #include <limits>
 #include <queue>
 
@@ -36,10 +37,11 @@ HybridAStar::HybridAStar(nav_msgs::msg::OccupancyGrid::SharedPtr grid)
     : grid_(grid) {
   height_ = grid->info.height;
   width_ = grid->info.width;
-  distance_resolution_ = grid->info.resolution;
+  map_resolution_ = grid->info.resolution;
+  distance_resolution_ = 3 * map_resolution_;
 
-  voronoi_.setGrid(grid_);
-  voronoi_.ComputeFT();
+  // voronoi_.setGrid(grid_);
+  // voronoi_.ComputeFT();
 }
 
 void HybridAStar::setTolerance(double angle, double distance) {
@@ -135,20 +137,20 @@ bool HybridAStar::isValid(int x, int y) {
 int HybridAStar::getIndex(int x, int y) { return y * width_ + x; }
 
 std::pair<int, int> HybridAStar::worldToMapDiscrete(double x, double y) {
-  int gx = floor((x - grid_->info.origin.position.x) / distance_resolution_);
-  int gy = floor((y - grid_->info.origin.position.y) / distance_resolution_);
+  int gx = floor((x - grid_->info.origin.position.x) / map_resolution_);
+  int gy = floor((y - grid_->info.origin.position.y) / map_resolution_);
   return {gx, gy};
 }
 
 std::pair<double, double> HybridAStar::worldToMapContinous(double x, double y) {
-  int gx = (x - grid_->info.origin.position.x) / distance_resolution_;
-  int gy = (y - grid_->info.origin.position.y) / distance_resolution_;
+  int gx = (x - grid_->info.origin.position.x) / map_resolution_;
+  int gy = (y - grid_->info.origin.position.y) / map_resolution_;
   return {gx, gy};
 }
 
 std::pair<double, double> HybridAStar::mapToWorld(double x, double y) {
-  int wx = x * distance_resolution_ + grid_->info.origin.position.x;
-  int wy = y * distance_resolution_ + grid_->info.origin.position.y;
+  int wx = x * map_resolution_ + grid_->info.origin.position.x;
+  int wy = y * map_resolution_ + grid_->info.origin.position.y;
   return {wx, wy};
 }
 
@@ -205,8 +207,8 @@ void HybridAStar::preprocess() {
       int new_idx = getIndex(new_x, new_y);
 
       double move_cost = (dx[i] == 0 || dy[i] == 0)
-                             ? distance_resolution_
-                             : distance_resolution_ * 1.41;
+                             ? map_resolution_
+                             : map_resolution_ * 1.41;
       double new_cost = cost + move_cost;
 
       if (new_cost < holonomic_with_obstacle_cost[new_idx]) {
@@ -245,8 +247,7 @@ std::vector<std::pair<Pose, double>> HybridAStar::expand(const Node *p) {
   std::vector<std::pair<Pose, double>> neighbors;
 
   const double step = distance_resolution_;
-  const double map_resolution = grid_->info.resolution;
-  const double sample_ds = map_resolution * 0.5;
+  const double sample_ds = map_resolution_ * 0.5;
 
   double penalty_steering = 1.05;
   double penalty_reverse = 3.0;
