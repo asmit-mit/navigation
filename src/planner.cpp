@@ -35,8 +35,8 @@ public:
     path_pub_ =
         this->create_publisher<nav_msgs::msg::Path>("/hybrid_astar_path", 10);
 
-    map_pub_ =
-        this->create_publisher<nav_msgs::msg::OccupancyGrid>("/hybrid_astar_map", 10);
+    // map_pub_ =
+    //     this->create_publisher<nav_msgs::msg::OccupancyGrid>("/hybrid_astar_map", 10);
 
     timer_ = this->create_wall_timer(500ms,
                                      std::bind(&Planner::timerCallback, this));
@@ -93,11 +93,11 @@ private:
     tf2::Matrix3x3(q_goal).getRPY(roll, pitch, goal_theta);
 
     planner::HybridAStar planner(latest_map_);
-    planner.setVelocities(0.5, 0.5);
+    planner.setVelocities(0.5, 2);
     planner.setTolerance(0.5, 0.2);
     planner.setStart(start_x, start_y, start_theta);
     planner.setGoal(goal_x, goal_y, goal_theta);
-    planner.setAngularResolution(5);
+    planner.setResolutions(3 * latest_map_->info.resolution, 5);
 
     std::vector<planner::Pose> path = planner.getPlan();
 
@@ -139,7 +139,7 @@ private:
   rclcpp::Subscription<geometry_msgs::msg::PoseStamped>::SharedPtr goal_sub_;
 
   rclcpp::Publisher<nav_msgs::msg::Path>::SharedPtr path_pub_;
-  rclcpp::Publisher<nav_msgs::msg::OccupancyGrid>::SharedPtr map_pub_;
+  // rclcpp::Publisher<nav_msgs::msg::OccupancyGrid>::SharedPtr map_pub_;
 
   nav_msgs::msg::OccupancyGrid::SharedPtr latest_map_;
 

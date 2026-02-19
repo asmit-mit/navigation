@@ -1,6 +1,4 @@
 #include <nav_msgs/msg/detail/occupancy_grid__struct.hpp>
-#include <queue>
-#include <unordered_set>
 #include <vector>
 
 #include "planner/pose.h"
@@ -15,7 +13,7 @@ public:
   HybridAStar(nav_msgs::msg::OccupancyGrid::SharedPtr grid);
 
   void setTolerance(double angle, double distance);
-  void setAngularResolution(double angle);
+  void setResolutions(double distance, double angle);
   void setVelocities(double linear, double angluar);
   void setStart(double x, double y, double theta);
   void setGoal(double x, double y, double theta);
@@ -80,6 +78,7 @@ private:
   std::vector<double> holonomic_with_obstacle_cost;
 
   std::vector<Node *> nodes;
+  std::vector<std::pair<double, double>> controls;
 
   friend class Node;
 };

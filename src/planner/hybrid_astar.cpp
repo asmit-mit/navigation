@@ -1,9 +1,9 @@
 #include "planner/hybrid_astar.h"
 
 #include <cmath>
-#include <iostream>
 #include <limits>
 #include <queue>
+#include <unordered_set>
 
 namespace planner {
 
@@ -38,7 +38,6 @@ HybridAStar::HybridAStar(nav_msgs::msg::OccupancyGrid::SharedPtr grid)
   height_ = grid->info.height;
   width_ = grid->info.width;
   map_resolution_ = grid->info.resolution;
-  distance_resolution_ = 3 * map_resolution_;
 
   // voronoi_.setGrid(grid_);
   // voronoi_.ComputeFT();
@@ -49,14 +48,23 @@ void HybridAStar::setTolerance(double angle, double distance) {
   distance_tolerance_ = distance;
 }
 
-void HybridAStar::setAngularResolution(double angle) {
+void HybridAStar::setResolutions(double distance, double angle) {
+  distance_resolution_ = distance;
   angular_resolution_ = angle;
 }
 
 void HybridAStar::setVelocities(double linear, double angular) {
   max_linear_velocity_ = linear;
   max_angular_velocity_ = angular;
-  reed_shepps_.setMinTurningRadius(0.2);
+
+  reed_shepps_.setMinTurningRadius(linear / angular);
+
+  controls = {{max_linear_velocity_, 0.0},
+              {max_linear_velocity_, max_angular_velocity_},
+              {max_linear_velocity_, -max_angular_velocity_},
+              {-max_linear_velocity_, 0.0},
+              {-max_linear_velocity_, max_angular_velocity_},
+              {-max_linear_velocity_, -max_angular_velocity_}};
 }
 
 void HybridAStar::setGoal(double x, double y, double theta) {
@@ -206,9 +214,8 @@ void HybridAStar::preprocess() {
 
       int new_idx = getIndex(new_x, new_y);
 
-      double move_cost = (dx[i] == 0 || dy[i] == 0)
-                             ? map_resolution_
-                             : map_resolution_ * 1.41;
+      double move_cost =
+          (dx[i] == 0 || dy[i] == 0) ? map_resolution_ : map_resolution_ * 1.41;
       double new_cost = cost + move_cost;
 
       if (new_cost < holonomic_with_obstacle_cost[new_idx]) {
@@ -247,18 +254,10 @@ std::vector<std::pair<Pose, double>> HybridAStar::expand(const Node *p) {
   std::vector<std::pair<Pose, double>> neighbors;
 
   const double step = distance_resolution_;
-  const double sample_ds = map_resolution_ * 0.5;
+  const double sample_ds = map_resolution_ * 0.2;
 
   double penalty_steering = 1.05;
   double penalty_reverse = 3.0;
-
-  std::vector<std::pair<double, double>> controls = {
-      {max_linear_velocity_, 0.0},
-      {max_linear_velocity_, max_angular_velocity_},
-      {max_linear_velocity_, -max_angular_velocity_},
-      {-max_linear_velocity_, 0.0},
-      {-max_linear_velocity_, max_angular_velocity_},
-      {-max_linear_velocity_, -max_angular_velocity_}};
 
   for (auto [u, omega] : controls) {
     Pose temp = p->pose;
