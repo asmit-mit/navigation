@@ -99,7 +99,7 @@ std::vector<Pose> HybridAStar::getPlan() {
 
     // add analytical expansion here
 
-    std::vector<std::pair<Pose, double>> neighbors = expand(curr->pose);
+    std::vector<std::pair<Pose, double>> neighbors = expand(curr);
 
     for (auto [nbr, cost] : neighbors) {
       Node *next = new Node(nbr, this);
@@ -241,11 +241,12 @@ bool HybridAStar::goalReached(const Node *node) {
           std::abs(dtheta) < angular_tolerance_);
 }
 
-std::vector<std::pair<Pose, double>> HybridAStar::expand(const Pose &p) {
+std::vector<std::pair<Pose, double>> HybridAStar::expand(const Node *p) {
   std::vector<std::pair<Pose, double>> neighbors;
 
-  double step = distance_resolution_;
-  double sample_resolution = distance_resolution_ * 0.5;
+  const double step = distance_resolution_;
+  const double map_resolution = grid_->info.resolution;
+  const double sample_ds = map_resolution * 0.5;
 
   double penalty_steering = 1.05;
   double penalty_reverse = 3.0;
@@ -256,26 +257,27 @@ std::vector<std::pair<Pose, double>> HybridAStar::expand(const Pose &p) {
       {max_linear_velocity_, -max_angular_velocity_},
       {-max_linear_velocity_, 0.0},
       {-max_linear_velocity_, max_angular_velocity_},
-      {-max_linear_velocity_, -max_angular_velocity_},
-  };
+      {-max_linear_velocity_, -max_angular_velocity_}};
 
   for (auto [u, omega] : controls) {
-    double arc_length = step;
-    double dt_total = arc_length / std::abs(u);
-
-    int num_samples = std::ceil(arc_length / sample_resolution);
-    double dt = dt_total / num_samples;
-
-    Pose temp = p;
+    Pose temp = p->pose;
     bool collision = false;
 
-    for (int i = 0; i < num_samples; i++) {
-      temp.x += u * std::cos(temp.theta) * dt;
-      temp.y += u * std::sin(temp.theta) * dt;
-      temp.theta += omega * dt;
-      temp.theta = std::atan2(std::sin(temp.theta), std::cos(temp.theta));
+    int num_samples = std::ceil(step / sample_ds);
+    double ds = step / num_samples;
+
+    for (int i = 0; i < num_samples; ++i) {
+      temp.x += ds * std::cos(temp.theta) * (u > 0 ? 1.0 : -1.0);
+      temp.y += ds * std::sin(temp.theta) * (u > 0 ? 1.0 : -1.0);
+
+      if (std::abs(omega) > 1e-6) {
+        double dtheta = omega * (ds / std::abs(u));
+        temp.theta += dtheta;
+        temp.theta = std::atan2(std::sin(temp.theta), std::cos(temp.theta));
+      }
 
       auto [gx, gy] = worldToMapDiscrete(temp.x, temp.y);
+
       if (!isValid(gx, gy)) {
         collision = true;
         break;
@@ -283,7 +285,7 @@ std::vector<std::pair<Pose, double>> HybridAStar::expand(const Pose &p) {
     }
 
     if (!collision) {
-      double cost = arc_length;
+      double cost = step;
 
       if (std::abs(omega) > 1e-6)
         cost *= penalty_steering;
@@ -294,6 +296,7 @@ std::vector<std::pair<Pose, double>> HybridAStar::expand(const Pose &p) {
       neighbors.emplace_back(temp, cost);
     }
   }
+
   return neighbors;
 }
 

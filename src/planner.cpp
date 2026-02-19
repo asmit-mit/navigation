@@ -1,6 +1,7 @@
 #include <chrono>
 #include <functional>
 #include <memory>
+#include <nav_msgs/msg/detail/occupancy_grid__struct.hpp>
 #include <vector>
 
 #include "geometry_msgs/msg/pose_stamped.hpp"
@@ -33,6 +34,9 @@ public:
 
     path_pub_ =
         this->create_publisher<nav_msgs::msg::Path>("/hybrid_astar_path", 10);
+
+    map_pub_ =
+        this->create_publisher<nav_msgs::msg::OccupancyGrid>("/hybrid_astar_map", 10);
 
     timer_ = this->create_wall_timer(500ms,
                                      std::bind(&Planner::timerCallback, this));
@@ -135,6 +139,7 @@ private:
   rclcpp::Subscription<geometry_msgs::msg::PoseStamped>::SharedPtr goal_sub_;
 
   rclcpp::Publisher<nav_msgs::msg::Path>::SharedPtr path_pub_;
+  rclcpp::Publisher<nav_msgs::msg::OccupancyGrid>::SharedPtr map_pub_;
 
   nav_msgs::msg::OccupancyGrid::SharedPtr latest_map_;
 

@@ -28,9 +28,8 @@ private:
     State state;
 
     double g_cost, h_cost;
-    double v, omega;
-    Node *parent;
 
+    Node *parent;
     HybridAStar *planner;
 
     Node(const Pose &p, HybridAStar *planner);
@@ -62,7 +61,7 @@ private:
   double distance(const Pose &a, const Pose &b);
   double heuristic(const Node *a);
   bool goalReached(const Node *node);
-  std::vector<std::pair<Pose, double>> expand(const Pose &p);
+  std::vector<std::pair<Pose, double>> expand(const Node *p);
 
   void freeNodes();
 
