@@ -51,6 +51,8 @@ void HybridAStar::setTolerance(double angle, double distance) {
 void HybridAStar::setResolutions(double distance, double angle) {
   distance_resolution_ = distance;
   angular_resolution_ = angle;
+
+  reed_shepps_.setDistanceResolution(distance_resolution_);
 }
 
 void HybridAStar::setVelocities(double linear, double angular) {
@@ -93,7 +95,7 @@ std::vector<Pose> HybridAStar::getPlan() {
 
     if (goalReached(curr)) {
       std::vector<Pose> path;
-      while (curr->parent) {
+      while (curr) {
         path.push_back(curr->pose);
         curr = curr->parent;
       }
@@ -107,7 +109,19 @@ std::vector<Pose> HybridAStar::getPlan() {
       continue;
     closed.insert(curr);
 
-    // add analytical expansion here
+    std::vector<Pose> analytical_expansion = analyticalExpansion(curr);
+    if (!analytical_expansion.empty()) {
+      std::vector<Pose> path;
+      while (curr) {
+        path.push_back(curr->pose);
+        curr = curr->parent;
+      }
+      std::reverse(path.begin(), path.end());
+      path.insert(path.end(), analytical_expansion.begin(),
+                  analytical_expansion.end());
+      freeNodes();
+      return path;
+    }
 
     std::vector<std::pair<Pose, double>> neighbors = expand(curr);
 
@@ -151,14 +165,14 @@ std::pair<int, int> HybridAStar::worldToMapDiscrete(double x, double y) {
 }
 
 std::pair<double, double> HybridAStar::worldToMapContinous(double x, double y) {
-  int gx = (x - grid_->info.origin.position.x) / map_resolution_;
-  int gy = (y - grid_->info.origin.position.y) / map_resolution_;
+  double gx = (x - grid_->info.origin.position.x) / map_resolution_;
+  double gy = (y - grid_->info.origin.position.y) / map_resolution_;
   return {gx, gy};
 }
 
 std::pair<double, double> HybridAStar::mapToWorld(double x, double y) {
-  int wx = x * map_resolution_ + grid_->info.origin.position.x;
-  int wy = y * map_resolution_ + grid_->info.origin.position.y;
+  double wx = x * map_resolution_ + grid_->info.origin.position.x;
+  double wy = y * map_resolution_ + grid_->info.origin.position.y;
   return {wx, wy};
 }
 
@@ -232,8 +246,56 @@ double HybridAStar::distance(const Pose &a, const Pose &b) {
   return std::hypot(dx, dy);
 }
 
+std::vector<Pose> HybridAStar::analyticalExpansion(const Node *node) {
+  reed_shepps_.simulate(node->pose, end_);
+  std::vector<Pose> rs_path = reed_shepps_.getOptimalPath();
+
+  if (rs_path.empty())
+    return {};
+
+  const double step = distance_resolution_;
+  const double sample_ds = map_resolution_ * 0.2;
+  const int num_samples = std::ceil(step / sample_ds);
+
+  for (size_t i = 1; i < rs_path.size(); ++i) {
+    const Pose &p0 = rs_path[i - 1];
+    const Pose &p1 = rs_path[i];
+
+    if (i == 1) {
+      auto [gx0, gy0] = worldToMapDiscrete(p0.x, p0.y);
+      if (!isValid(gx0, gy0))
+        return {};
+    }
+
+    for (int j = 1; j <= num_samples; ++j) {
+      double t = static_cast<double>(j) / (num_samples + 1);
+
+      Pose interp;
+      interp.x = p0.x + t * (p1.x - p0.x);
+      interp.y = p0.y + t * (p1.y - p0.y);
+
+      double dtheta = std::atan2(std::sin(p1.theta - p0.theta),
+                                 std::cos(p1.theta - p0.theta));
+      interp.theta = p0.theta + t * dtheta;
+      interp.theta = std::atan2(std::sin(interp.theta), std::cos(interp.theta));
+
+      auto [gx, gy] = worldToMapDiscrete(interp.x, interp.y);
+
+      if (!isValid(gx, gy))
+        return {};
+    }
+
+    auto [gx1, gy1] = worldToMapDiscrete(p1.x, p1.y);
+    if (!isValid(gx1, gy1))
+      return {};
+  }
+
+  return rs_path;
+}
 double HybridAStar::heuristic(const Node *node) {
-  double h_rs = reed_shepps_.getOptimalPath(node->pose, end_);
+  reed_shepps_.simulate(node->pose, end_);
+
+  double h_rs = reed_shepps_.getOptimalDistance();
   double h_2d = distance(node->pose, end_);
 
   double h1 = std::max(h_rs, h_2d);
@@ -250,21 +312,20 @@ bool HybridAStar::goalReached(const Node *node) {
           std::abs(dtheta) < angular_tolerance_);
 }
 
-std::vector<std::pair<Pose, double>> HybridAStar::expand(const Node *p) {
+std::vector<std::pair<Pose, double>> HybridAStar::expand(const Node *node) {
   std::vector<std::pair<Pose, double>> neighbors;
 
   const double step = distance_resolution_;
   const double sample_ds = map_resolution_ * 0.2;
+  const int num_samples = std::ceil(step / sample_ds);
+  const double ds = step / num_samples;
 
-  double penalty_steering = 1.05;
-  double penalty_reverse = 3.0;
+  const double penalty_steering = 1.05;
+  const double penalty_reverse = 3.0;
 
   for (auto [u, omega] : controls) {
-    Pose temp = p->pose;
+    Pose temp = node->pose;
     bool collision = false;
-
-    int num_samples = std::ceil(step / sample_ds);
-    double ds = step / num_samples;
 
     for (int i = 0; i < num_samples; ++i) {
       temp.x += ds * std::cos(temp.theta) * (u > 0 ? 1.0 : -1.0);

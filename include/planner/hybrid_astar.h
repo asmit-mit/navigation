@@ -57,9 +57,10 @@ private:
   int getIndex(int x, int y);
   void preprocess();
   double distance(const Pose &a, const Pose &b);
-  double heuristic(const Node *a);
+  double heuristic(const Node *node);
   bool goalReached(const Node *node);
-  std::vector<std::pair<Pose, double>> expand(const Node *p);
+  std::vector<Pose> analyticalExpansion(const Node *node);
+  std::vector<std::pair<Pose, double>> expand(const Node *node);
 
   void freeNodes();
 

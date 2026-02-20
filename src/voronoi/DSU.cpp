@@ -40,8 +40,4 @@ bool DSU::unite(int a, int b) {
   return true;
 }
 
-bool DSU::same(int a, int b) { return find(a) == find(b); }
-
-int DSU::componentSize(int x) { return size[find(x)]; }
-
 } // namespace voronoi

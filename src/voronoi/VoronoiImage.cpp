@@ -1,5 +1,4 @@
 #include "voronoi/VoronoiImage.h"
-#include "voronoi/Pixel.h"
 
 #include <algorithm>
 #include <cmath>
@@ -117,11 +116,12 @@ bool VoronoiImage::isValid(int x, int y) {
   return x >= 0 && y >= 0 && x < width_ && y < height_;
 }
 
-long long VoronoiImage::dist2(const Pixel &a, const Pixel &b) {
-  int dx = a.x - b.x;
-  int dy = a.y - b.y;
+long long VoronoiImage::dist2(const Pixel &a, const Pixel &b) const {
+  long long dx = a.x - b.x;
+  long long dy = a.y - b.y;
   return dx * dx + dy * dy;
 }
+
 
 void VoronoiImage::ComputeF0(std::vector<int8_t> &image_,
                              std::vector<Pixel> &feature_vector_,
@@ -245,4 +245,5 @@ bool VoronoiImage::RemoveF2(const Pixel &u, const Pixel &v, const Pixel &w,
 
   return (c * dv - b * du - a * dw - a * b * c) > 0;
 }
-}; // namespace voronoi
+}
+; // namespace voronoi

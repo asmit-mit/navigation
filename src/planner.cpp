@@ -36,7 +36,8 @@ public:
         this->create_publisher<nav_msgs::msg::Path>("/hybrid_astar_path", 10);
 
     // map_pub_ =
-    //     this->create_publisher<nav_msgs::msg::OccupancyGrid>("/hybrid_astar_map", 10);
+    //     this->create_publisher<nav_msgs::msg::OccupancyGrid>("/hybrid_astar_map",
+    //     10);
 
     timer_ = this->create_wall_timer(500ms,
                                      std::bind(&Planner::timerCallback, this));
@@ -72,7 +73,6 @@ private:
   }
 
   void timerCallback() {
-
     if (!latest_map_ || !have_start_ || !have_goal_)
       return;
 
@@ -98,7 +98,6 @@ private:
     planner.setStart(start_x, start_y, start_theta);
     planner.setGoal(goal_x, goal_y, goal_theta);
     planner.setResolutions(3 * latest_map_->info.resolution, 5);
-
     std::vector<planner::Pose> path = planner.getPlan();
 
     if (path.empty()) {
@@ -111,7 +110,6 @@ private:
     ros_path.header.frame_id = "odom";
 
     for (const auto &pose : path) {
-
       geometry_msgs::msg::PoseStamped pose_stamped;
       pose_stamped.header = ros_path.header;
 

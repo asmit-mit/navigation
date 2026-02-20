@@ -1,8 +1,5 @@
-// made using https://github.com/nathanlct/reeds-shepp-curves/
-
 #include "planner/reed_shepps.h"
 
-#include <algorithm>
 #include <cstdlib>
 #include <limits>
 
@@ -22,14 +19,25 @@ double ReedShepps::M(double theta) {
   return theta;
 }
 
-void ReedShepps::setMinTurningRadius(double min_turning_radius_) {
-  this->min_turning_radius_ = min_turning_radius_;
+void ReedShepps::setDistanceResolution(double resolution) {
+  distance_resolution_ = resolution;
 }
 
-double ReedShepps::getOptimalPath(const Pose &start, const Pose &end) {
-  double min_dist = std::numeric_limits<double>::infinity();
+void ReedShepps::setMinTurningRadius(double min_radius) {
+  min_turning_radius_ = min_radius;
+}
+
+void ReedShepps::simulate(const Pose &start, const Pose &end) {
+  start_ = start;
+  end_ = end;
+
+  optimal_path_dist_ = std::numeric_limits<double>::infinity();
+  optimal_path_.clear();
 
   Pose relative = changeOfBasis(start, end);
+  relative.x /= min_turning_radius_;
+  relative.y /= min_turning_radius_;
+
   double x = relative.x, y = relative.y, theta = relative.theta;
 
   Pose relative_timeflip = Pose(-x, y, -theta);
@@ -37,13 +45,57 @@ double ReedShepps::getOptimalPath(const Pose &start, const Pose &end) {
   Pose relative_timeflip_reflect = Pose(-x, -y, theta);
 
   for (auto fn : pathFns) {
-    min_dist = std::min(min_dist, (this->*fn)(relative));
-    min_dist = std::min(min_dist, (this->*fn)(relative_timeflip));
-    min_dist = std::min(min_dist, (this->*fn)(relative_reflect));
-    min_dist = std::min(min_dist, (this->*fn)(relative_timeflip_reflect));
+    (this->*fn)(relative, false, false);
+    (this->*fn)(relative_timeflip, true, false);
+    (this->*fn)(relative_reflect, false, true);
+    (this->*fn)(relative_timeflip_reflect, true, true);
+  }
+}
+
+double ReedShepps::getOptimalDistance() {
+  return optimal_path_dist_ * min_turning_radius_;
+}
+
+std::vector<Pose> ReedShepps::getOptimalPath() {
+  std::vector<Pose> poses;
+  Pose curr = start_;
+  poses.push_back(curr);
+
+  for (const auto &segment : optimal_path_) {
+    double direction = (segment.gear == Gear::FORWARD) ? 1.0 : -1.0;
+    double curvature = 0.0;
+
+    if (segment.steering == Steering::LEFT)
+      curvature = 1.0 / min_turning_radius_;
+    else if (segment.steering == Steering::RIGHT)
+      curvature = -1.0 / min_turning_radius_;
+
+    double remaining = std::abs(segment.param) * min_turning_radius_;
+    double step = distance_resolution_;
+
+    while (remaining > 1e-9) {
+      double ds = std::min(step, remaining);
+      double d = direction * ds;
+      double dtheta = d * curvature;
+
+      if (std::abs(curvature) < 1e-9) {
+        curr.x += d * std::cos(curr.theta);
+        curr.y += d * std::sin(curr.theta);
+      } else {
+        double R = 1.0 / curvature;
+        curr.x += R * (std::sin(curr.theta + dtheta) - std::sin(curr.theta));
+        curr.y -= R * (std::cos(curr.theta + dtheta) - std::cos(curr.theta));
+        curr.theta += dtheta;
+      }
+
+      curr.theta = M(curr.theta);
+      poses.push_back(curr);
+
+      remaining -= ds;
+    }
   }
 
-  return min_dist * min_turning_radius_;
+  return poses;
 }
 
 std::pair<double, double> ReedShepps::R(double x, double y) {
@@ -70,89 +122,187 @@ double ReedShepps::deg2rad(double deg) { return M_PI * deg / 180; }
 
 int ReedShepps::sign(int x) { return (x >= 0) ? 1 : -1; }
 
-double ReedShepps::getAllPaths() { return 0; }
-
-double ReedShepps::path1(const Pose &p) {
+void ReedShepps::path1(const Pose &p, bool timeflip, bool reflect) {
   double phi = p.theta;
   auto [u, t] = R(p.x - std::sin(phi), p.y - 1 + std::cos(phi));
   double v = M(phi - t);
 
-  return std::abs(t) + std::abs(u) + std::abs(v);
+  double dist = std::abs(t) + std::abs(u) + std::abs(v);
+
+  std::vector<PathElement> path;
+  path.emplace_back(PathElement(t, Steering::LEFT, Gear::FORWARD));
+  path.emplace_back(PathElement(u, Steering::STRAIGHT, Gear::FORWARD));
+  path.emplace_back(PathElement(v, Steering::LEFT, Gear::FORWARD));
+
+  if (timeflip) {
+    for (int i = 0; i < (int)path.size(); i++)
+      path[i].reverseGear();
+  }
+
+  if (reflect) {
+    for (int i = 0; i < (int)path.size(); i++)
+      path[i].reverseSteering();
+  }
+
+  if (dist < optimal_path_dist_) {
+    optimal_path_dist_ = dist;
+    optimal_path_ = path;
+  }
 }
 
-double ReedShepps::path2(const Pose &p) {
+void ReedShepps::path2(const Pose &p, bool timeflip, bool reflect) {
   double phi = M(p.theta);
   auto [rho, t1] = R(p.x + std::sin(phi), p.y - 1 - std::cos(phi));
 
   if (rho * rho < 4)
-    return std::numeric_limits<double>::infinity();
+    return;
 
   double u = std::sqrt(rho * rho - 4);
   double t = M(t1 + std::atan2(2, u));
   double v = M(t - phi);
 
-  return std::abs(t) + std::abs(u) + std::abs(v);
+  double dist = std::abs(t) + std::abs(u) + std::abs(v);
+
+  std::vector<PathElement> path;
+  path.emplace_back(PathElement(t, Steering::LEFT, Gear::FORWARD));
+  path.emplace_back(PathElement(u, Steering::STRAIGHT, Gear::FORWARD));
+  path.emplace_back(PathElement(v, Steering::RIGHT, Gear::FORWARD));
+
+  if (timeflip) {
+    for (int i = 0; i < (int)path.size(); i++)
+      path[i].reverseGear();
+  }
+
+  if (reflect) {
+    for (int i = 0; i < (int)path.size(); i++)
+      path[i].reverseSteering();
+  }
+
+  if (dist < optimal_path_dist_) {
+    optimal_path_dist_ = dist;
+    optimal_path_ = path;
+  }
 }
 
-double ReedShepps::path3(const Pose &p) {
+void ReedShepps::path3(const Pose &p, bool timeflip, bool reflect) {
   double phi = p.theta;
   double x1 = p.x - std::sin(phi);
   double eta = p.y - 1 + std::cos(phi);
   auto [rho, theta] = R(x1, eta);
 
   if (rho > 4)
-    return std::numeric_limits<double>::infinity();
+    return;
 
   double A = std::acos(rho / 4);
   double t = M(theta + M_PI_2 + A);
   double u = M(M_PI - 2 * A);
   double v = M(phi - t - u);
 
-  return std::abs(t) + std::abs(u) + std::abs(v);
+  double dist = std::abs(t) + std::abs(u) + std::abs(v);
+
+  std::vector<PathElement> path;
+  path.emplace_back(PathElement(t, Steering::LEFT, Gear::FORWARD));
+  path.emplace_back(PathElement(u, Steering::RIGHT, Gear::BACKWARD));
+  path.emplace_back(PathElement(v, Steering::LEFT, Gear::FORWARD));
+
+  if (timeflip) {
+    for (int i = 0; i < (int)path.size(); i++)
+      path[i].reverseGear();
+  }
+
+  if (reflect) {
+    for (int i = 0; i < (int)path.size(); i++)
+      path[i].reverseSteering();
+  }
+
+  if (dist < optimal_path_dist_) {
+    optimal_path_dist_ = dist;
+    optimal_path_ = path;
+  }
 }
 
-double ReedShepps::path4(const Pose &p) {
+void ReedShepps::path4(const Pose &p, bool timeflip, bool reflect) {
   double phi = p.theta;
   double x1 = p.x - std::sin(phi);
   double eta = p.y - 1 + std::cos(phi);
   auto [rho, theta] = R(x1, eta);
 
   if (rho > 4)
-    return std::numeric_limits<double>::infinity();
+    return;
 
   double A = std::acos(rho / 4);
   double t = M(theta + M_PI_2 + A);
   double u = M(M_PI - 2 * A);
   double v = M(t + u - phi);
 
-  return std::abs(t) + std::abs(u) + std::abs(v);
+  double dist = std::abs(t) + std::abs(u) + std::abs(v);
+
+  std::vector<PathElement> path;
+  path.emplace_back(PathElement(t, Steering::LEFT, Gear::FORWARD));
+  path.emplace_back(PathElement(u, Steering::RIGHT, Gear::BACKWARD));
+  path.emplace_back(PathElement(v, Steering::LEFT, Gear::BACKWARD));
+
+  if (timeflip) {
+    for (int i = 0; i < (int)path.size(); i++)
+      path[i].reverseGear();
+  }
+
+  if (reflect) {
+    for (int i = 0; i < (int)path.size(); i++)
+      path[i].reverseSteering();
+  }
+
+  if (dist < optimal_path_dist_) {
+    optimal_path_dist_ = dist;
+    optimal_path_ = path;
+  }
 }
 
-double ReedShepps::path5(const Pose &p) {
+void ReedShepps::path5(const Pose &p, bool timeflip, bool reflect) {
   double phi = p.theta;
   double x1 = p.x - std::sin(phi);
   double eta = p.y - 1 + std::cos(phi);
   auto [rho, theta] = R(x1, eta);
 
   if (rho > 4)
-    return std::numeric_limits<double>::infinity();
+    return;
 
   double u = std::acos(1 - rho * rho / 8);
   double A = std::asin(2 * std::sin(u) / rho);
   double t = M(theta + M_PI_2 - A);
   double v = M(t - u - phi);
 
-  return std::abs(t) + std::abs(u) + std::abs(v);
+  double dist = std::abs(t) + std::abs(u) + std::abs(v);
+
+  std::vector<PathElement> path;
+  path.emplace_back(PathElement(t, Steering::LEFT, Gear::FORWARD));
+  path.emplace_back(PathElement(u, Steering::RIGHT, Gear::FORWARD));
+  path.emplace_back(PathElement(v, Steering::LEFT, Gear::BACKWARD));
+
+  if (timeflip) {
+    for (int i = 0; i < (int)path.size(); i++)
+      path[i].reverseGear();
+  }
+
+  if (reflect) {
+    for (int i = 0; i < (int)path.size(); i++)
+      path[i].reverseSteering();
+  }
+
+  if (dist < optimal_path_dist_) {
+    optimal_path_dist_ = dist;
+    optimal_path_ = path;
+  }
 }
 
-double ReedShepps::path6(const Pose &p) {
+void ReedShepps::path6(const Pose &p, bool timeflip, bool reflect) {
   double phi = p.theta;
   double x1 = p.x + std::sin(phi);
   double eta = p.y - 1 - std::cos(phi);
   auto [rho, theta] = R(x1, eta);
 
   if (rho > 4)
-    return std::numeric_limits<double>::infinity();
+    return;
 
   double A, t, u, v;
   if (rho <= 2) {
@@ -167,46 +317,111 @@ double ReedShepps::path6(const Pose &p) {
     v = M(phi - t + 2 * u);
   }
 
-  return std::abs(t) + std::abs(u) + std::abs(u) + std::abs(v);
+  double dist = std::abs(t) + std::abs(u) + std::abs(u) + std::abs(v);
+
+  std::vector<PathElement> path;
+  path.emplace_back(PathElement(t, Steering::LEFT, Gear::FORWARD));
+  path.emplace_back(PathElement(u, Steering::RIGHT, Gear::FORWARD));
+  path.emplace_back(PathElement(u, Steering::LEFT, Gear::BACKWARD));
+  path.emplace_back(PathElement(v, Steering::RIGHT, Gear::BACKWARD));
+
+  if (timeflip) {
+    for (int i = 0; i < (int)path.size(); i++)
+      path[i].reverseGear();
+  }
+
+  if (reflect) {
+    for (int i = 0; i < (int)path.size(); i++)
+      path[i].reverseSteering();
+  }
+
+  if (dist < optimal_path_dist_) {
+    optimal_path_dist_ = dist;
+    optimal_path_ = path;
+  }
 }
 
-double ReedShepps::path7(const Pose &p) {
+void ReedShepps::path7(const Pose &p, bool timeflip, bool reflect) {
   double phi = p.theta;
   double xi = p.x + std::sin(phi);
   double eta = p.y - 1 - std::cos(phi);
   auto [rho, theta] = R(xi, eta);
   double u1 = (20 - rho * rho) / 16;
 
-  if (rho <= 6 && u1 >= 0 && u1 <= 1) {
-    double u = std::acos(u1);
-    double A = std::asin(2 * std::sin(u) / rho);
-    double t = M(theta + M_PI_2 + A);
-    double v = M(t - phi);
+  if (rho > 6)
+    return;
 
-    return std::abs(t) + std::abs(u) + std::abs(u) + std::abs(v);
+  if (u1 < 0 || u1 > 1)
+    return;
+
+  double u = std::acos(u1);
+  double A = std::asin(2 * std::sin(u) / rho);
+  double t = M(theta + M_PI_2 + A);
+  double v = M(t - phi);
+
+  double dist = std::abs(t) + std::abs(u) + std::abs(u) + std::abs(v);
+
+  std::vector<PathElement> path;
+  path.emplace_back(PathElement(t, Steering::LEFT, Gear::FORWARD));
+  path.emplace_back(PathElement(u, Steering::RIGHT, Gear::BACKWARD));
+  path.emplace_back(PathElement(u, Steering::LEFT, Gear::BACKWARD));
+  path.emplace_back(PathElement(v, Steering::RIGHT, Gear::FORWARD));
+
+  if (timeflip) {
+    for (int i = 0; i < (int)path.size(); i++)
+      path[i].reverseGear();
   }
 
-  return std::numeric_limits<double>::infinity();
+  if (reflect) {
+    for (int i = 0; i < (int)path.size(); i++)
+      path[i].reverseSteering();
+  }
+
+  if (dist < optimal_path_dist_) {
+    optimal_path_dist_ = dist;
+    optimal_path_ = path;
+  }
 }
 
-double ReedShepps::path8(const Pose &p) {
+void ReedShepps::path8(const Pose &p, bool timeflip, bool reflect) {
   double phi = p.theta;
   double xi = p.x - std::sin(phi);
   double eta = p.y - 1 + std::cos(phi);
   auto [rho, theta] = R(xi, eta);
 
   if (rho < 2)
-    return std::numeric_limits<double>::infinity();
+    return;
 
   double u = std::sqrt(rho * rho - 4) - 2;
   double A = std::atan2(2, u + 2);
   double t = M(theta + M_PI_2 + A);
   double v = M(t - phi + M_PI_2);
 
-  return std::abs(t) + M_PI_2 + std::abs(u) + std::abs(v);
+  double dist = std::abs(t) + M_PI_2 + std::abs(u) + std::abs(v);
+
+  std::vector<PathElement> path;
+  path.emplace_back(PathElement(t, Steering::LEFT, Gear::FORWARD));
+  path.emplace_back(PathElement(M_PI_2, Steering::RIGHT, Gear::BACKWARD));
+  path.emplace_back(PathElement(u, Steering::STRAIGHT, Gear::BACKWARD));
+  path.emplace_back(PathElement(v, Steering::LEFT, Gear::BACKWARD));
+
+  if (timeflip) {
+    for (int i = 0; i < (int)path.size(); i++)
+      path[i].reverseGear();
+  }
+
+  if (reflect) {
+    for (int i = 0; i < (int)path.size(); i++)
+      path[i].reverseSteering();
+  }
+
+  if (dist < optimal_path_dist_) {
+    optimal_path_dist_ = dist;
+    optimal_path_ = path;
+  }
 }
 
-double ReedShepps::path9(const Pose &p) {
+void ReedShepps::path9(const Pose &p, bool timeflip, bool reflect) {
   double phi = p.theta;
   double xi = p.x - std::sin(phi);
   double eta = p.y - 1 + std::cos(phi);
@@ -214,33 +429,75 @@ double ReedShepps::path9(const Pose &p) {
   auto [rho, theta] = R(xi, eta);
 
   if (rho < 2)
-    return std::numeric_limits<double>::infinity();
+    return;
 
   double u = std::sqrt(rho * rho - 4) - 2;
   double A = std::atan2(u + 2, 2);
   double t = M(theta + M_PI_2 - A);
   double v = M(t - phi - M_PI_2);
 
-  return std::abs(t) + std::abs(u) + M_PI_2 + std::abs(v);
+  double dist = std::abs(t) + std::abs(u) + M_PI_2 + std::abs(v);
+
+  std::vector<PathElement> path;
+  path.emplace_back(PathElement(t, Steering::LEFT, Gear::FORWARD));
+  path.emplace_back(PathElement(u, Steering::STRAIGHT, Gear::FORWARD));
+  path.emplace_back(PathElement(M_PI_2, Steering::RIGHT, Gear::FORWARD));
+  path.emplace_back(PathElement(v, Steering::LEFT, Gear::BACKWARD));
+
+  if (timeflip) {
+    for (int i = 0; i < (int)path.size(); i++)
+      path[i].reverseGear();
+  }
+
+  if (reflect) {
+    for (int i = 0; i < (int)path.size(); i++)
+      path[i].reverseSteering();
+  }
+
+  if (dist < optimal_path_dist_) {
+    optimal_path_dist_ = dist;
+    optimal_path_ = path;
+  }
 }
 
-double ReedShepps::path10(const Pose &p) {
+void ReedShepps::path10(const Pose &p, bool timeflip, bool reflect) {
   double phi = p.theta;
   double xi = p.x + std::sin(phi);
   double eta = p.y - 1 - std::cos(phi);
   auto [rho, theta] = R(xi, eta);
 
   if (rho < 2)
-    return std::numeric_limits<double>::infinity();
+    return;
 
   double t = M(theta + M_PI_2);
   double u = rho - 2;
   double v = M(phi - t - M_PI_2);
 
-  return std::abs(t) + M_PI_2 + std::abs(u) + std::abs(v);
+  double dist = std::abs(t) + M_PI_2 + std::abs(u) + std::abs(v);
+
+  std::vector<PathElement> path;
+  path.emplace_back(PathElement(t, Steering::LEFT, Gear::FORWARD));
+  path.emplace_back(PathElement(M_PI_2, Steering::RIGHT, Gear::BACKWARD));
+  path.emplace_back(PathElement(u, Steering::STRAIGHT, Gear::BACKWARD));
+  path.emplace_back(PathElement(v, Steering::RIGHT, Gear::BACKWARD));
+
+  if (timeflip) {
+    for (int i = 0; i < (int)path.size(); i++)
+      path[i].reverseGear();
+  }
+
+  if (reflect) {
+    for (int i = 0; i < (int)path.size(); i++)
+      path[i].reverseSteering();
+  }
+
+  if (dist < optimal_path_dist_) {
+    optimal_path_dist_ = dist;
+    optimal_path_ = path;
+  }
 }
 
-double ReedShepps::path11(const Pose &p) {
+void ReedShepps::path11(const Pose &p, bool timeflip, bool reflect) {
   double phi = p.theta;
   double xi = p.x + std::sin(phi);
   double eta = p.y - 1 - std::cos(phi);
@@ -248,16 +505,37 @@ double ReedShepps::path11(const Pose &p) {
   auto [rho, theta] = R(xi, eta);
 
   if (rho < 2)
-    return std::numeric_limits<double>::infinity();
+    return;
 
   double t = M(theta);
   double u = rho - 2;
   double v = M(phi - t - M_PI_2);
 
-  return std::abs(t) + std::abs(u) + M_PI_2 + std::abs(v);
+  double dist = std::abs(t) + std::abs(u) + M_PI_2 + std::abs(v);
+
+  std::vector<PathElement> path;
+  path.emplace_back(PathElement(t, Steering::LEFT, Gear::FORWARD));
+  path.emplace_back(PathElement(u, Steering::STRAIGHT, Gear::FORWARD));
+  path.emplace_back(PathElement(M_PI_2, Steering::LEFT, Gear::FORWARD));
+  path.emplace_back(PathElement(v, Steering::RIGHT, Gear::BACKWARD));
+
+  if (timeflip) {
+    for (int i = 0; i < (int)path.size(); i++)
+      path[i].reverseGear();
+  }
+
+  if (reflect) {
+    for (int i = 0; i < (int)path.size(); i++)
+      path[i].reverseSteering();
+  }
+
+  if (dist < optimal_path_dist_) {
+    optimal_path_dist_ = dist;
+    optimal_path_ = path;
+  }
 }
 
-double ReedShepps::path12(const Pose &p) {
+void ReedShepps::path12(const Pose &p, bool timeflip, bool reflect) {
   double phi = p.theta;
   double xi = p.x + std::sin(phi);
   double eta = p.y - 1 - std::cos(phi);
@@ -265,13 +543,36 @@ double ReedShepps::path12(const Pose &p) {
   auto [rho, theta] = R(xi, eta);
 
   if (rho < 4)
-    return std::numeric_limits<double>::infinity();
+    return;
 
   double u = std::sqrt(rho * rho - 4) - 4;
   double A = std::atan2(2, u + 4);
   double t = M(theta + M_PI_2 + A);
   double v = M(t - phi);
 
-  return std::abs(t) + M_PI_2 + std::abs(u) + M_PI_2 + std::abs(v);
+  double dist = std::abs(t) + M_PI_2 + std::abs(u) + M_PI_2 + std::abs(v);
+
+  std::vector<PathElement> path;
+  path.emplace_back(PathElement(t, Steering::LEFT, Gear::FORWARD));
+  path.emplace_back(PathElement(M_PI_2, Steering::RIGHT, Gear::BACKWARD));
+  path.emplace_back(PathElement(u, Steering::STRAIGHT, Gear::BACKWARD));
+  path.emplace_back(PathElement(M_PI_2, Steering::LEFT, Gear::BACKWARD));
+  path.emplace_back(PathElement(v, Steering::RIGHT, Gear::FORWARD));
+
+  if (timeflip) {
+    for (int i = 0; i < (int)path.size(); i++)
+      path[i].reverseGear();
+  }
+
+  if (reflect) {
+    for (int i = 0; i < (int)path.size(); i++)
+      path[i].reverseSteering();
+  }
+
+  if (dist < optimal_path_dist_) {
+    optimal_path_dist_ = dist;
+    optimal_path_ = path;
+  }
 }
+
 }; // namespace planner

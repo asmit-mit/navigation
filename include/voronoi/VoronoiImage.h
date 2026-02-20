@@ -1,9 +1,9 @@
 #pragma once
 
 #include <nav_msgs/msg/detail/occupancy_grid__struct.hpp>
+#include <vector>
 
 #include "voronoi/DSU.h"
-#include "voronoi/Pixel.h"
 
 namespace voronoi {
 
@@ -18,11 +18,25 @@ public:
   void ComputeFT();
 
 private:
+  struct Pixel {
+    int x, y;
+
+    Pixel() : x(-1), y(-1) {}
+    Pixel(int x, int y) : x(x), y(y) {}
+
+    bool operator==(const Pixel &other) const {
+      return x == other.x && y == other.y;
+    }
+
+    bool operator!=(const Pixel &other) const { return !(*this == other); }
+  };
+
+private:
   int getIndex(int x, int y);
   bool isBoundary(const std::vector<int8_t> &image_, int x, int y);
   bool isValid(int x, int y);
 
-  long long dist2(const Pixel &a, const Pixel &b);
+  long long dist2(const Pixel &a, const Pixel &b) const;
 
   void ComputeF0(std::vector<int8_t> &image_,
                  std::vector<Pixel> &feature_vector_, bool compute_dsu = false);

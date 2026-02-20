@@ -15,8 +15,6 @@ public:
   void init(int n);
   int find(int x);
   bool unite(int a, int b);
-  bool same(int a, int b);
-  int componentSize(int x);
 };
 
 } // namespace voronoi
