@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <cmath>
 #include <limits>
+#include <nav_msgs/msg/detail/occupancy_grid__struct.hpp>
 
 namespace voronoi {
 
@@ -10,7 +11,7 @@ void VoronoiImage::setGrid(nav_msgs::msg::OccupancyGrid::SharedPtr map) {
   max_dist2_ = 0;
   width_ = map->info.width;
   height_ = map->info.height;
-  grid_ = map;
+  grid_ = std::make_shared<nav_msgs::msg::OccupancyGrid>(*map);
   dsu.init(width_ * height_);
   obstacle_feature_vector_.resize(width_ * height_);
   edge_feature_vector_.resize(width_ * height_);

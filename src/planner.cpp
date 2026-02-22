@@ -92,7 +92,7 @@ private:
     double goal_theta;
     tf2::Matrix3x3(q_goal).getRPY(roll, pitch, goal_theta);
 
-    planner::HybridAStar planner(latest_map_);
+    planner.setGrid(latest_map_);
     planner.setVelocities(0.5, 2);
     planner.setTolerance(0.5, 0.2);
     planner.setStart(start_x, start_y, start_theta);
@@ -143,6 +143,8 @@ private:
 
   geometry_msgs::msg::PoseStamped::SharedPtr start_pose_;
   geometry_msgs::msg::PoseStamped::SharedPtr goal_pose_;
+
+  planner::HybridAStar planner;
 
   bool have_start_ = false;
   bool have_goal_ = false;

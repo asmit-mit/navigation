@@ -10,13 +10,15 @@ namespace planner {
 
 class HybridAStar {
 public:
-  HybridAStar(nav_msgs::msg::OccupancyGrid::SharedPtr grid);
+  HybridAStar();
 
+  void setGrid(nav_msgs::msg::OccupancyGrid::SharedPtr grid);
   void setTolerance(double angle, double distance);
   void setResolutions(double distance, double angle);
   void setVelocities(double linear, double angluar);
   void setStart(double x, double y, double theta);
   void setGoal(double x, double y, double theta);
+  void setIterations(int iterations);
   std::vector<Pose> getPlan();
 
 private:
@@ -56,12 +58,14 @@ private:
   bool isValid(int x, int y);
   int getIndex(int x, int y);
   void preprocess();
+  void simulate();
+  void smoothen();
   double distance(const Pose &a, const Pose &b);
   double heuristic(const Node *node);
   bool goalReached(const Node *node);
   std::vector<Pose> analyticalExpansion(const Node *node);
   std::vector<std::pair<Pose, double>> expand(const Node *node);
-
+  
   void freeNodes();
 
 private:
@@ -69,6 +73,7 @@ private:
   double angular_resolution_, distance_resolution_;
   double angular_tolerance_, distance_tolerance_;
   double max_linear_velocity_, max_angular_velocity_;
+  int iterations_;
 
   int height_, width_;
   Pose start_, end_;
@@ -76,10 +81,12 @@ private:
   nav_msgs::msg::OccupancyGrid::SharedPtr grid_;
   voronoi::VoronoiImage voronoi_;
   ReedShepps reed_shepps_;
-  std::vector<double> holonomic_with_obstacle_cost;
+  std::vector<double> holonomic_with_obstacle_cost_;
+  std::vector<Pose> plan_;
 
-  std::vector<Node *> nodes;
-  std::vector<std::pair<double, double>> controls;
+  std::vector<Node *> nodes_;
+  std::vector<std::pair<double, double>> controls_;
+
 
   friend class Node;
 };
