@@ -1,20 +1,28 @@
 #pragma once
 
-#include <cstddef>
+#include <utility>
 namespace planner {
 
-struct State {
+struct State3d {
   int grid_x;
   int grid_y;
   int theta_bin;
 
-  State();
-  State(int grid_x, int grid_y, int theta_bin);
-  bool operator==(const State &other) const;
+  State3d();
+  State3d(int grid_x, int grid_y, int theta_bin);
+  bool operator==(const State3d &other) const;
+};
+
+
+struct State2d {
+  int x, y;
+
+  State2d(const std::pair<int, int> &s);
+  State2d(const State3d &s);
 };
 
 struct StateHash {
-  std::size_t operator()(const State &k) const;
+  std::size_t operator()(const State3d &k) const;
 };
 
 }; // namespace planner

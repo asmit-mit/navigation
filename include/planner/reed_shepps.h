@@ -1,3 +1,5 @@
+#pragma once
+
 #include <array>
 #include <cmath>
 #include <utility>
@@ -23,10 +25,11 @@ public:
   ReedShepps();
 
   void setDistanceResolution(double resolution);
+  void setTolerance(double angle, double distance);
   void setMinTurningRadius(double min_radius);
-  void simulate(const Pose &start, const Pose &end);
+  void simulate(const Pose3d &start, const Pose3d &end);
   double getOptimalDistance();
-  std::vector<Pose> getOptimalPath();
+  std::vector<Pose3d> getOptimalPath();
 
 private:
   struct PathElement {
@@ -55,35 +58,29 @@ private:
   };
 
 private:
-  double M(double theta);
-  std::pair<double, double> R(double x, double y);
-  Pose changeOfBasis(const Pose &p1, const Pose &p2);
-  double rad2deg(double rad);
-  double deg2rad(double deg);
-  int sign(int x);
-
-  void path1(const Pose &p, bool timeflip, bool reflect);
-  void path2(const Pose &p, bool timeflip, bool reflect);
-  void path3(const Pose &p, bool timeflip, bool reflect);
-  void path4(const Pose &p, bool timeflip, bool reflect);
-  void path5(const Pose &p, bool timeflip, bool reflect);
-  void path6(const Pose &p, bool timeflip, bool reflect);
-  void path7(const Pose &p, bool timeflip, bool reflect);
-  void path8(const Pose &p, bool timeflip, bool reflect);
-  void path9(const Pose &p, bool timeflip, bool reflect);
-  void path10(const Pose &p, bool timeflip, bool reflect);
-  void path11(const Pose &p, bool timeflip, bool reflect);
-  void path12(const Pose &p, bool timeflip, bool reflect);
+  void path1(const Pose3d &p, bool timeflip, bool reflect);
+  void path2(const Pose3d &p, bool timeflip, bool reflect);
+  void path3(const Pose3d &p, bool timeflip, bool reflect);
+  void path4(const Pose3d &p, bool timeflip, bool reflect);
+  void path5(const Pose3d &p, bool timeflip, bool reflect);
+  void path6(const Pose3d &p, bool timeflip, bool reflect);
+  void path7(const Pose3d &p, bool timeflip, bool reflect);
+  void path8(const Pose3d &p, bool timeflip, bool reflect);
+  void path9(const Pose3d &p, bool timeflip, bool reflect);
+  void path10(const Pose3d &p, bool timeflip, bool reflect);
+  void path11(const Pose3d &p, bool timeflip, bool reflect);
+  void path12(const Pose3d &p, bool timeflip, bool reflect);
 
 private:
   double min_turning_radius_;
+  double angular_tolerance_, distance_tolerance_;
   double optimal_path_dist_;
   double distance_resolution_;
   std::vector<PathElement> optimal_path_;
 
-  Pose start_, end_;
+  Pose3d start_, end_;
 
-  using pathFn = void (ReedShepps::*)(const Pose &, bool, bool);
+  using pathFn = void (ReedShepps::*)(const Pose3d &, bool, bool);
 
   const std::array<pathFn, 12> pathFns = {
       &ReedShepps::path1,  &ReedShepps::path2,  &ReedShepps::path3,

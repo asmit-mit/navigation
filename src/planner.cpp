@@ -10,7 +10,6 @@
 #include "rclcpp/rclcpp.hpp"
 
 #include "tf2/LinearMath/Matrix3x3.hpp"
-#include "tf2/LinearMath/Quaternion.h"
 #include "tf2_geometry_msgs/tf2_geometry_msgs.hpp"
 
 #include "planner/hybrid_astar.h"
@@ -92,13 +91,15 @@ private:
     double goal_theta;
     tf2::Matrix3x3(q_goal).getRPY(roll, pitch, goal_theta);
 
+    RCLCPP_INFO(this->get_logger(), "Start: %f %f", start_x, start_y);
+    RCLCPP_INFO(this->get_logger(), "Goal: %f %f", goal_x, goal_y);
     planner.setGrid(latest_map_);
-    planner.setVelocities(0.5, 2);
+    planner.setVelocities(0.5, 0.5);
     planner.setTolerance(0.5, 0.2);
     planner.setStart(start_x, start_y, start_theta);
     planner.setGoal(goal_x, goal_y, goal_theta);
-    planner.setResolutions(3 * latest_map_->info.resolution, 5);
-    std::vector<planner::Pose> path = planner.getPlan();
+    planner.setResolutions(0.1, 5);
+    std::vector<planner::Pose3d> path = planner.getPlan();
 
     if (path.empty()) {
       RCLCPP_WARN(this->get_logger(), "No path found");

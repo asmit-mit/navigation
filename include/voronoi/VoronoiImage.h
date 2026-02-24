@@ -15,6 +15,8 @@ public:
   double distanceToNearestObstacle(int x, int y);
   double distanceToNearestEdge(int x, int y);
   double getMaxDist() const;
+  std::pair<int, int> getNearestObstacle(int x, int y);
+  std::pair<int, int> getNearestEdge(int x, int y);
   void ComputeFT();
 
 private:

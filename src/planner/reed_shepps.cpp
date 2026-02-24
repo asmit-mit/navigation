@@ -1,5 +1,7 @@
 #include "planner/reed_shepps.h"
+#include "utils/math_utils.h"
 
+#include <algorithm>
 #include <cstdlib>
 #include <limits>
 
@@ -7,42 +9,42 @@ namespace planner {
 
 ReedShepps::ReedShepps() {}
 
-double ReedShepps::M(double theta) {
-  theta = std::fmod(theta, 2 * M_PI);
-
-  if (theta < 0)
-    theta += 2 * M_PI;
-
-  if (theta >= M_PI)
-    theta -= 2 * M_PI;
-
-  return theta;
-}
-
 void ReedShepps::setDistanceResolution(double resolution) {
   distance_resolution_ = resolution;
+}
+
+void ReedShepps::setTolerance(double angle, double distance) {
+  angular_tolerance_ = angle;
+  distance_tolerance_ = distance;
 }
 
 void ReedShepps::setMinTurningRadius(double min_radius) {
   min_turning_radius_ = min_radius;
 }
 
-void ReedShepps::simulate(const Pose &start, const Pose &end) {
+void ReedShepps::simulate(const Pose3d &start, const Pose3d &end) {
   start_ = start;
   end_ = end;
+
+  if (utils::distance(start, end) < distance_tolerance_) {
+    optimal_path_ = {};
+    optimal_path_dist_ = 0;
+    return;
+  }
+
 
   optimal_path_dist_ = std::numeric_limits<double>::infinity();
   optimal_path_.clear();
 
-  Pose relative = changeOfBasis(start, end);
+  Pose3d relative = utils::changeOfBasis(start, end);
   relative.x /= min_turning_radius_;
   relative.y /= min_turning_radius_;
 
   double x = relative.x, y = relative.y, theta = relative.theta;
 
-  Pose relative_timeflip = Pose(-x, y, -theta);
-  Pose relative_reflect = Pose(x, -y, -theta);
-  Pose relative_timeflip_reflect = Pose(-x, -y, theta);
+  Pose3d relative_timeflip = Pose3d(-x, y, -theta);
+  Pose3d relative_reflect = Pose3d(x, -y, -theta);
+  Pose3d relative_timeflip_reflect = Pose3d(-x, -y, theta);
 
   for (auto fn : pathFns) {
     (this->*fn)(relative, false, false);
@@ -56,9 +58,9 @@ double ReedShepps::getOptimalDistance() {
   return optimal_path_dist_ * min_turning_radius_;
 }
 
-std::vector<Pose> ReedShepps::getOptimalPath() {
-  std::vector<Pose> poses;
-  Pose curr = start_;
+std::vector<Pose3d> ReedShepps::getOptimalPath() {
+  std::vector<Pose3d> poses;
+  Pose3d curr = start_;
   poses.push_back(curr);
 
   for (const auto &segment : optimal_path_) {
@@ -88,7 +90,7 @@ std::vector<Pose> ReedShepps::getOptimalPath() {
         curr.theta += dtheta;
       }
 
-      curr.theta = M(curr.theta);
+      curr.theta = utils::M(curr.theta);
       poses.push_back(curr);
 
       remaining -= ds;
@@ -98,34 +100,10 @@ std::vector<Pose> ReedShepps::getOptimalPath() {
   return poses;
 }
 
-std::pair<double, double> ReedShepps::R(double x, double y) {
-  double r = std::hypot(x, y);
-  double theta = std::atan2(y, x);
-  return {r, theta};
-}
-
-Pose ReedShepps::changeOfBasis(const Pose &p1, const Pose &p2) {
-  double theta1 = p1.theta;
-  double dx = p2.x - p1.x;
-  double dy = p2.y - p1.y;
-
-  double new_x = dx * std::cos(theta1) + dy * std::sin(theta1);
-  double new_y = -dx * std::sin(theta1) + dy * std::cos(theta1);
-  double new_theta = p2.theta - p1.theta;
-
-  return Pose(new_x, new_y, new_theta);
-}
-
-double ReedShepps::rad2deg(double rad) { return 180 * rad / M_PI; }
-
-double ReedShepps::deg2rad(double deg) { return M_PI * deg / 180; }
-
-int ReedShepps::sign(int x) { return (x >= 0) ? 1 : -1; }
-
-void ReedShepps::path1(const Pose &p, bool timeflip, bool reflect) {
+void ReedShepps::path1(const Pose3d &p, bool timeflip, bool reflect) {
   double phi = p.theta;
-  auto [u, t] = R(p.x - std::sin(phi), p.y - 1 + std::cos(phi));
-  double v = M(phi - t);
+  auto [u, t] = utils::R(p.x - std::sin(phi), p.y - 1 + std::cos(phi));
+  double v = utils::M(phi - t);
 
   double dist = std::abs(t) + std::abs(u) + std::abs(v);
 
@@ -150,16 +128,16 @@ void ReedShepps::path1(const Pose &p, bool timeflip, bool reflect) {
   }
 }
 
-void ReedShepps::path2(const Pose &p, bool timeflip, bool reflect) {
-  double phi = M(p.theta);
-  auto [rho, t1] = R(p.x + std::sin(phi), p.y - 1 - std::cos(phi));
+void ReedShepps::path2(const Pose3d &p, bool timeflip, bool reflect) {
+  double phi = utils::M(p.theta);
+  auto [rho, t1] = utils::R(p.x + std::sin(phi), p.y - 1 - std::cos(phi));
 
   if (rho * rho < 4)
     return;
 
   double u = std::sqrt(rho * rho - 4);
-  double t = M(t1 + std::atan2(2, u));
-  double v = M(t - phi);
+  double t = utils::M(t1 + std::atan2(2, u));
+  double v = utils::M(t - phi);
 
   double dist = std::abs(t) + std::abs(u) + std::abs(v);
 
@@ -184,19 +162,19 @@ void ReedShepps::path2(const Pose &p, bool timeflip, bool reflect) {
   }
 }
 
-void ReedShepps::path3(const Pose &p, bool timeflip, bool reflect) {
+void ReedShepps::path3(const Pose3d &p, bool timeflip, bool reflect) {
   double phi = p.theta;
   double x1 = p.x - std::sin(phi);
   double eta = p.y - 1 + std::cos(phi);
-  auto [rho, theta] = R(x1, eta);
+  auto [rho, theta] = utils::R(x1, eta);
 
   if (rho > 4)
     return;
 
-  double A = std::acos(rho / 4);
-  double t = M(theta + M_PI_2 + A);
-  double u = M(M_PI - 2 * A);
-  double v = M(phi - t - u);
+  double A = std::acos(std::clamp(rho / 4, -1.0, 1.0));
+  double t = utils::M(theta + M_PI_2 + A);
+  double u = utils::M(M_PI - 2 * A);
+  double v = utils::M(phi - t - u);
 
   double dist = std::abs(t) + std::abs(u) + std::abs(v);
 
@@ -221,19 +199,19 @@ void ReedShepps::path3(const Pose &p, bool timeflip, bool reflect) {
   }
 }
 
-void ReedShepps::path4(const Pose &p, bool timeflip, bool reflect) {
+void ReedShepps::path4(const Pose3d &p, bool timeflip, bool reflect) {
   double phi = p.theta;
   double x1 = p.x - std::sin(phi);
   double eta = p.y - 1 + std::cos(phi);
-  auto [rho, theta] = R(x1, eta);
+  auto [rho, theta] = utils::R(x1, eta);
 
   if (rho > 4)
     return;
 
-  double A = std::acos(rho / 4);
-  double t = M(theta + M_PI_2 + A);
-  double u = M(M_PI - 2 * A);
-  double v = M(t + u - phi);
+  double A = std::acos(std::clamp(rho / 4, -1.0, 1.0));
+  double t = utils::M(theta + M_PI_2 + A);
+  double u = utils::M(M_PI - 2 * A);
+  double v = utils::M(t + u - phi);
 
   double dist = std::abs(t) + std::abs(u) + std::abs(v);
 
@@ -258,19 +236,19 @@ void ReedShepps::path4(const Pose &p, bool timeflip, bool reflect) {
   }
 }
 
-void ReedShepps::path5(const Pose &p, bool timeflip, bool reflect) {
+void ReedShepps::path5(const Pose3d &p, bool timeflip, bool reflect) {
   double phi = p.theta;
   double x1 = p.x - std::sin(phi);
   double eta = p.y - 1 + std::cos(phi);
-  auto [rho, theta] = R(x1, eta);
+  auto [rho, theta] = utils::R(x1, eta);
 
   if (rho > 4)
     return;
 
-  double u = std::acos(1 - rho * rho / 8);
+  double u = std::acos(std::clamp(1 - rho * rho / 8, -1.0, 1.0));
   double A = std::asin(2 * std::sin(u) / rho);
-  double t = M(theta + M_PI_2 - A);
-  double v = M(t - u - phi);
+  double t = utils::M(theta + M_PI_2 - A);
+  double v = utils::M(t - u - phi);
 
   double dist = std::abs(t) + std::abs(u) + std::abs(v);
 
@@ -295,26 +273,26 @@ void ReedShepps::path5(const Pose &p, bool timeflip, bool reflect) {
   }
 }
 
-void ReedShepps::path6(const Pose &p, bool timeflip, bool reflect) {
+void ReedShepps::path6(const Pose3d &p, bool timeflip, bool reflect) {
   double phi = p.theta;
   double x1 = p.x + std::sin(phi);
   double eta = p.y - 1 - std::cos(phi);
-  auto [rho, theta] = R(x1, eta);
+  auto [rho, theta] = utils::R(x1, eta);
 
   if (rho > 4)
     return;
 
   double A, t, u, v;
   if (rho <= 2) {
-    A = std::acos((rho + 2) / 4);
-    t = M(theta + M_PI_2 + A);
-    u = M(A);
-    v = M(phi - t + 2 * u);
+    A = std::acos(std::clamp((rho + 2) / 4, -1.0, 1.0));
+    t = utils::M(theta + M_PI_2 + A);
+    u = utils::M(A);
+    v = utils::M(phi - t + 2 * u);
   } else {
-    A = std::acos((rho - 2) / 4);
-    t = M(theta + M_PI_2 - A);
-    u = M(M_PI - A);
-    v = M(phi - t + 2 * u);
+    A = std::acos(std::clamp((rho - 2) / 4, -1.0, 1.0));
+    t = utils::M(theta + M_PI_2 - A);
+    u = utils::M(M_PI - A);
+    v = utils::M(phi - t + 2 * u);
   }
 
   double dist = std::abs(t) + std::abs(u) + std::abs(u) + std::abs(v);
@@ -341,11 +319,11 @@ void ReedShepps::path6(const Pose &p, bool timeflip, bool reflect) {
   }
 }
 
-void ReedShepps::path7(const Pose &p, bool timeflip, bool reflect) {
+void ReedShepps::path7(const Pose3d &p, bool timeflip, bool reflect) {
   double phi = p.theta;
   double xi = p.x + std::sin(phi);
   double eta = p.y - 1 - std::cos(phi);
-  auto [rho, theta] = R(xi, eta);
+  auto [rho, theta] = utils::R(xi, eta);
   double u1 = (20 - rho * rho) / 16;
 
   if (rho > 6)
@@ -356,8 +334,8 @@ void ReedShepps::path7(const Pose &p, bool timeflip, bool reflect) {
 
   double u = std::acos(u1);
   double A = std::asin(2 * std::sin(u) / rho);
-  double t = M(theta + M_PI_2 + A);
-  double v = M(t - phi);
+  double t = utils::M(theta + M_PI_2 + A);
+  double v = utils::M(t - phi);
 
   double dist = std::abs(t) + std::abs(u) + std::abs(u) + std::abs(v);
 
@@ -383,19 +361,19 @@ void ReedShepps::path7(const Pose &p, bool timeflip, bool reflect) {
   }
 }
 
-void ReedShepps::path8(const Pose &p, bool timeflip, bool reflect) {
+void ReedShepps::path8(const Pose3d &p, bool timeflip, bool reflect) {
   double phi = p.theta;
   double xi = p.x - std::sin(phi);
   double eta = p.y - 1 + std::cos(phi);
-  auto [rho, theta] = R(xi, eta);
+  auto [rho, theta] = utils::R(xi, eta);
 
   if (rho < 2)
     return;
 
   double u = std::sqrt(rho * rho - 4) - 2;
   double A = std::atan2(2, u + 2);
-  double t = M(theta + M_PI_2 + A);
-  double v = M(t - phi + M_PI_2);
+  double t = utils::M(theta + M_PI_2 + A);
+  double v = utils::M(t - phi + M_PI_2);
 
   double dist = std::abs(t) + M_PI_2 + std::abs(u) + std::abs(v);
 
@@ -421,20 +399,19 @@ void ReedShepps::path8(const Pose &p, bool timeflip, bool reflect) {
   }
 }
 
-void ReedShepps::path9(const Pose &p, bool timeflip, bool reflect) {
+void ReedShepps::path9(const Pose3d &p, bool timeflip, bool reflect) {
   double phi = p.theta;
   double xi = p.x - std::sin(phi);
   double eta = p.y - 1 + std::cos(phi);
-
-  auto [rho, theta] = R(xi, eta);
+  auto [rho, theta] = utils::R(xi, eta);
 
   if (rho < 2)
     return;
 
   double u = std::sqrt(rho * rho - 4) - 2;
   double A = std::atan2(u + 2, 2);
-  double t = M(theta + M_PI_2 - A);
-  double v = M(t - phi - M_PI_2);
+  double t = utils::M(theta + M_PI_2 - A);
+  double v = utils::M(t - phi - M_PI_2);
 
   double dist = std::abs(t) + std::abs(u) + M_PI_2 + std::abs(v);
 
@@ -460,18 +437,18 @@ void ReedShepps::path9(const Pose &p, bool timeflip, bool reflect) {
   }
 }
 
-void ReedShepps::path10(const Pose &p, bool timeflip, bool reflect) {
+void ReedShepps::path10(const Pose3d &p, bool timeflip, bool reflect) {
   double phi = p.theta;
   double xi = p.x + std::sin(phi);
   double eta = p.y - 1 - std::cos(phi);
-  auto [rho, theta] = R(xi, eta);
+  auto [rho, theta] = utils::R(xi, eta);
 
   if (rho < 2)
     return;
 
-  double t = M(theta + M_PI_2);
+  double t = utils::M(theta + M_PI_2);
   double u = rho - 2;
-  double v = M(phi - t - M_PI_2);
+  double v = utils::M(phi - t - M_PI_2);
 
   double dist = std::abs(t) + M_PI_2 + std::abs(u) + std::abs(v);
 
@@ -497,19 +474,19 @@ void ReedShepps::path10(const Pose &p, bool timeflip, bool reflect) {
   }
 }
 
-void ReedShepps::path11(const Pose &p, bool timeflip, bool reflect) {
+void ReedShepps::path11(const Pose3d &p, bool timeflip, bool reflect) {
   double phi = p.theta;
   double xi = p.x + std::sin(phi);
   double eta = p.y - 1 - std::cos(phi);
 
-  auto [rho, theta] = R(xi, eta);
+  auto [rho, theta] = utils::R(xi, eta);
 
   if (rho < 2)
     return;
 
-  double t = M(theta);
+  double t = utils::M(theta);
   double u = rho - 2;
-  double v = M(phi - t - M_PI_2);
+  double v = utils::M(phi - t - M_PI_2);
 
   double dist = std::abs(t) + std::abs(u) + M_PI_2 + std::abs(v);
 
@@ -535,20 +512,20 @@ void ReedShepps::path11(const Pose &p, bool timeflip, bool reflect) {
   }
 }
 
-void ReedShepps::path12(const Pose &p, bool timeflip, bool reflect) {
+void ReedShepps::path12(const Pose3d &p, bool timeflip, bool reflect) {
   double phi = p.theta;
   double xi = p.x + std::sin(phi);
   double eta = p.y - 1 - std::cos(phi);
 
-  auto [rho, theta] = R(xi, eta);
+  auto [rho, theta] = utils::R(xi, eta);
 
   if (rho < 4)
     return;
 
   double u = std::sqrt(rho * rho - 4) - 4;
   double A = std::atan2(2, u + 4);
-  double t = M(theta + M_PI_2 + A);
-  double v = M(t - phi);
+  double t = utils::M(theta + M_PI_2 + A);
+  double v = utils::M(t - phi);
 
   double dist = std::abs(t) + M_PI_2 + std::abs(u) + M_PI_2 + std::abs(v);
 

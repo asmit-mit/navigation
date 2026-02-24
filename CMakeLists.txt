@@ -24,7 +24,9 @@ add_executable(planner
   src/planner/pose.cpp
   src/planner/state.cpp
   src/planner/hybrid_astar.cpp
-  src/planner/reed_shepps.cpp)
+  src/planner/reed_shepps.cpp
+
+  src/utils/math_utils.cpp)
 target_include_directories(planner PUBLIC
   $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
   $<INSTALL_INTERFACE:include>)

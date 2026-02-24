@@ -1,20 +1,25 @@
 #include "planner/hybrid_astar.h"
+#include "utils/math_utils.h"
 
+#include <iostream>
 #include <cmath>
 #include <limits>
 #include <queue>
 #include <unordered_set>
 
+using std::cout;
+using std::endl;
+
 namespace planner {
 
-HybridAStar::Node::Node(const Pose &p, HybridAStar *planner)
+HybridAStar::Node::Node(const Pose3d &p, HybridAStar *planner)
     : pose(p), parent(nullptr), planner(planner) {
   state = planner->poseToState(p);
   g_cost = 0;
   h_cost = 0;
 }
 
-HybridAStar::Node::Node(const Pose &p, HybridAStar *planner, Node *parent)
+HybridAStar::Node::Node(const Pose3d &p, HybridAStar *planner, Node *parent)
     : pose(p), parent(parent), planner(planner) {
   state = planner->poseToState(p);
   g_cost = 0;
@@ -33,8 +38,35 @@ bool HybridAStar::NodeEqual::operator()(Node *a, Node *b) const {
   return a->state == b->state;
 }
 
+HybridAStar::Grad::Grad() {
+  x = 0;
+  y = 0;
+}
+
+HybridAStar::Grad::Grad(double x, double y) : x(x), y(y) {}
+
+HybridAStar::Grad HybridAStar::Grad::operator*(double scalar) {
+  return Grad(x * scalar, y * scalar);
+}
+
+HybridAStar::Grad HybridAStar::Grad::operator+(const Grad &other) {
+  return Grad(x + other.x, y + other.y);
+}
+
 HybridAStar::HybridAStar() {
-  iterations_ = 0;
+  iterations_ = 500;
+
+  max_angular_velocity_ = 0.5;
+  max_linear_velocity_ = 2; 
+
+  angular_resolution_ = 5;
+  distance_resolution_ = 1;
+
+  angular_tolerance_ = 0.1;
+  distance_tolerance_ = 0.5;
+
+  reed_shepps_.setDistanceResolution(distance_resolution_);
+  reed_shepps_.setMinTurningRadius(1);
 }
 
 void HybridAStar::setGrid(nav_msgs::msg::OccupancyGrid::SharedPtr grid) {
@@ -74,21 +106,21 @@ void HybridAStar::setVelocities(double linear, double angular) {
 }
 
 void HybridAStar::setGoal(double x, double y, double theta) {
-  end_ = Pose(x, y, theta);
+  end_ = Pose3d(x, y, theta);
   preprocess();
 }
 
 void HybridAStar::setStart(double x, double y, double theta) {
-  start_ = Pose(x, y, theta);
+  start_ = Pose3d(x, y, theta);
 }
 
-void HybridAStar::setIterations(int iterations) {
-  iterations_ = iterations;
-}
+void HybridAStar::setIterations(int iterations) { iterations_ = iterations; }
 
-std::vector<Pose> HybridAStar::getPlan() {
+std::vector<Pose3d> HybridAStar::getPlan() {
   simulate();
-  smoothen();
+  // smoothen();
+  freeNodes();
+  cout << plan_.size() << endl;
   return plan_;
 }
 
@@ -117,7 +149,15 @@ std::pair<double, double> HybridAStar::mapToWorld(double x, double y) {
   return {wx, wy};
 }
 
-State HybridAStar::poseToState(const Pose &p) {
+State2d HybridAStar::pose2dToState2d(const Pose2d &p) {
+  return State2d(worldToMapDiscrete(p.x, p.y));
+}
+
+Pose2d HybridAStar::state2dToPose2d(const State2d &s) {
+  return Pose2d(mapToWorld(s.x, s.y));
+}
+
+State3d HybridAStar::poseToState(const Pose3d &p) {
   auto [x, y] = worldToMapDiscrete(p.x, p.y);
 
   double theta_deg = p.theta * 180.0 / M_PI;
@@ -128,7 +168,7 @@ State HybridAStar::poseToState(const Pose &p) {
 
   int theta_bin = static_cast<int>(std::floor(theta_deg / angular_resolution_));
 
-  return State(x, y, theta_bin);
+  return State3d(x, y, theta_bin);
 }
 
 void HybridAStar::preprocess() {
@@ -199,13 +239,12 @@ void HybridAStar::simulate() {
     open.pop();
 
     if (goalReached(curr)) {
-      std::vector<Pose> plan_;
       while (curr) {
         plan_.push_back(curr->pose);
         curr = curr->parent;
       }
       std::reverse(plan_.begin(), plan_.end());
-      freeNodes();
+      cout << plan_.size() << endl;
       return;
     }
 
@@ -214,23 +253,25 @@ void HybridAStar::simulate() {
       continue;
     closed.insert(curr);
 
-    std::vector<Pose> analytical_expansion = analyticalExpansion(curr);
+    std::vector<Pose3d> analytical_expansion = analyticalExpansion(curr);
     if (!analytical_expansion.empty()) {
+      cout << analytical_expansion.size() << endl;
+      cout << curr->pose.x << " " << curr->pose.y << endl;
       while (curr) {
         plan_.push_back(curr->pose);
         curr = curr->parent;
       }
       std::reverse(plan_.begin(), plan_.end());
       plan_.insert(plan_.end(), analytical_expansion.begin(),
-                  analytical_expansion.end());
-      freeNodes();
+                   analytical_expansion.end());
+      cout << plan_.back().x << " " << plan_.back().y << endl;
       return;
     }
 
-    std::vector<std::pair<Pose, double>> neighbors = expand(curr);
+    std::vector<std::pair<Pose3d, double>> neighbors = expand(curr);
 
     for (auto [nbr, cost] : neighbors) {
-      State next_state = poseToState(nbr);
+      State3d next_state = poseToState(nbr);
       if (!isValid(next_state.grid_x, next_state.grid_y))
         continue;
 
@@ -248,7 +289,6 @@ void HybridAStar::simulate() {
       break;
   }
 
-  freeNodes();
   return;
 }
 
@@ -256,20 +296,22 @@ void HybridAStar::smoothen() {
   if (plan_.empty())
     return;
 
+  grad_.resize(plan_.size());
   for (int i = 0; i < iterations_; i++) {
-    // smooth path
+    int cost = optimizationStep(1, 1, 1, 1, 1, 1, 1);
+    double step = 0.01;
+
+    int n = plan_.size();
+    for (int i = 0; i < n; i++) {
+      plan_[i].x -= step * grad_[i].x;
+      plan_[i].y -= step * grad_[i].y;
+    }
   }
 }
 
-double HybridAStar::distance(const Pose &a, const Pose &b) {
-  double dx = a.x - b.x;
-  double dy = a.y - b.y;
-  return std::hypot(dx, dy);
-}
-
-std::vector<Pose> HybridAStar::analyticalExpansion(const Node *node) {
+std::vector<Pose3d> HybridAStar::analyticalExpansion(const Node *node) {
   reed_shepps_.simulate(node->pose, end_);
-  std::vector<Pose> rs_path = reed_shepps_.getOptimalPath();
+  std::vector<Pose3d> rs_path = reed_shepps_.getOptimalPath();
 
   if (rs_path.empty())
     return {};
@@ -279,8 +321,8 @@ std::vector<Pose> HybridAStar::analyticalExpansion(const Node *node) {
   const int num_samples = std::ceil(step / sample_ds);
 
   for (size_t i = 1; i < rs_path.size(); ++i) {
-    const Pose &p0 = rs_path[i - 1];
-    const Pose &p1 = rs_path[i];
+    const Pose3d &p0 = rs_path[i - 1];
+    const Pose3d &p1 = rs_path[i];
 
     if (i == 1) {
       auto [gx0, gy0] = worldToMapDiscrete(p0.x, p0.y);
@@ -291,7 +333,7 @@ std::vector<Pose> HybridAStar::analyticalExpansion(const Node *node) {
     for (int j = 1; j <= num_samples; ++j) {
       double t = static_cast<double>(j) / (num_samples + 1);
 
-      Pose interp;
+      Pose3d interp;
       interp.x = p0.x + t * (p1.x - p0.x);
       interp.y = p0.y + t * (p1.y - p0.y);
 
@@ -317,7 +359,7 @@ double HybridAStar::heuristic(const Node *node) {
   reed_shepps_.simulate(node->pose, end_);
 
   double h_rs = reed_shepps_.getOptimalDistance();
-  double h_2d = distance(node->pose, end_);
+  double h_2d = utils::distance(node->pose, end_);
 
   double h1 = std::max(h_rs, h_2d);
   double h2 = holonomic_with_obstacle_cost_[getIndex(node->state.grid_x,
@@ -329,12 +371,12 @@ bool HybridAStar::goalReached(const Node *node) {
   double dtheta = std::atan2(std::sin(node->pose.theta - end_.theta),
                              std::cos(node->pose.theta - end_.theta));
 
-  return (distance(node->pose, end_) < distance_tolerance_ &&
+  return (utils::distance(node->pose, end_) < distance_tolerance_ &&
           std::abs(dtheta) < angular_tolerance_);
 }
 
-std::vector<std::pair<Pose, double>> HybridAStar::expand(const Node *node) {
-  std::vector<std::pair<Pose, double>> neighbors;
+std::vector<std::pair<Pose3d, double>> HybridAStar::expand(const Node *node) {
+  std::vector<std::pair<Pose3d, double>> neighbors;
 
   const double step = distance_resolution_;
   const double sample_ds = map_resolution_ * 0.2;
@@ -345,7 +387,7 @@ std::vector<std::pair<Pose, double>> HybridAStar::expand(const Node *node) {
   const double penalty_reverse = 3.0;
 
   for (auto [u, omega] : controls_) {
-    Pose temp = node->pose;
+    Pose3d temp = node->pose;
     bool collision = false;
 
     for (int i = 0; i < num_samples; ++i) {
@@ -381,6 +423,102 @@ std::vector<std::pair<Pose, double>> HybridAStar::expand(const Node *node) {
 
   return neighbors;
 }
+
+double HybridAStar::optimizationStep(double w_rho, double w_o, double w_kappa,
+                                     double w_s, double alpha, double dmax,
+                                     double kappa_max) {
+  const int n = plan_.size();
+
+  for (Grad &g : grad_) {
+    g.x = 0;
+    g.y = 0;
+  }
+
+  double total_cost = 0.0;
+
+  for (int i = 0; i < n - 1; i++) {
+    total_cost += voronoiCost(i, w_rho, alpha);
+    total_cost += obstacleCost(i, w_o, dmax);
+    if (i > 0 && i < n - 1) {
+      total_cost += curvatureCost(i, w_kappa, kappa_max);
+      total_cost += smoothnessCost(i, w_s);
+    }
+  }
+
+  grad_[0] = Grad(0, 0);
+  grad_[n - 1] = Grad(0, 0);
+
+  return total_cost;
+}
+
+double HybridAStar::voronoiCost(int idx, double w_rho, double alpha) {
+  Pose2d xi_pose(plan_[idx]);
+  State2d xi_state(pose2dToState2d(xi_pose));
+
+  State2d oi_state(voronoi_.getNearestObstacle(xi_state.x, xi_state.y));
+  Pose2d oi_pose(state2dToPose2d(oi_state));
+
+  State2d vi_state(voronoi_.getNearestEdge(xi_state.x, xi_state.y));
+  Pose2d vi_pose(state2dToPose2d(vi_state));
+
+  double dO = voronoi_.distanceToNearestObstacle(xi_state.x, xi_state.y) /
+              map_resolution_;
+  double dV =
+      voronoi_.distanceToNearestEdge(xi_state.x, xi_state.y) / map_resolution_;
+  double dO_max = voronoi_.getMaxDist() / map_resolution_;
+
+  double rho = (alpha / (alpha + dO)) * (dV / dO + dV) *
+               ((dO - dO_max) / dO_max) * ((dO - dO_max) / dO_max);
+
+  double pv_dv = (alpha / (alpha + dO)) *
+                 (((dO - dO_max) / dO_max) * ((dO - dO_max) / dO_max)) *
+                 (dO / ((dO + dV) * (dO + dV)));
+
+  double pv_do = (alpha / (alpha + dO)) * ((dO - dO_max) / (dO_max * dO_max)) *
+                 (dV / (dO + dV)) *
+                 ((dO_max - dO) / (alpha + dO) + (dO_max - dO) / (dO + dV) + 2);
+
+  Grad do_xi, dv_xi;
+
+  do_xi.x = (xi_pose.x - oi_pose.x) / dO;
+  do_xi.y = (xi_pose.y - oi_pose.y) / dO;
+
+  dv_xi.x = (xi_pose.x - vi_pose.x) / dV;
+  dv_xi.y = (xi_pose.y - vi_pose.y) / dV;
+
+  Grad pv_xi = do_xi * pv_do + dv_xi * pv_dv;
+  grad_[idx].x += w_rho * pv_xi.x;
+  grad_[idx].y += w_rho * pv_xi.y;
+
+  return w_rho * rho;
+}
+
+double HybridAStar::obstacleCost(int idx, double w_o, double dmax) {
+  Pose2d xi_pose(plan_[idx]);
+  State2d xi_state(pose2dToState2d(xi_pose));
+
+  State2d oi_state(voronoi_.getNearestObstacle(xi_state.x, xi_state.y));
+  Pose2d oi_pose(state2dToPose2d(oi_state));
+
+  double dO = voronoi_.distanceToNearestObstacle(xi_state.x, xi_state.y) /
+              map_resolution_;
+
+  if (dO > dmax)
+    return 0;
+
+  Grad rho_xi;
+  rho_xi.x = 2 * (dO - dmax) * (xi_pose.x - oi_pose.x) / dO;
+  rho_xi.y = 2 * (dO - dmax) * (xi_pose.y - oi_pose.y) / dO;
+
+  grad_[idx].x += w_o * rho_xi.x;
+  grad_[idx].y += w_o * rho_xi.y;
+
+  return w_o * (dO - dmax) * (dO - dmax);
+}
+
+double HybridAStar::curvatureCost(int idx, double w_kappa, double kappa_max) {}
+
+double HybridAStar::smoothnessCost(int idx, double w_s) {}
 
 void HybridAStar::freeNodes() {
   for (int i = 0; i < (int)nodes_.size(); i++)

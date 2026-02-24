@@ -19,21 +19,21 @@ public:
   void setStart(double x, double y, double theta);
   void setGoal(double x, double y, double theta);
   void setIterations(int iterations);
-  std::vector<Pose> getPlan();
+  std::vector<Pose3d> getPlan();
 
 private:
   class Node {
   public:
-    Pose pose;
-    State state;
+    Pose3d pose;
+    State3d state;
 
     double g_cost, h_cost;
 
     Node *parent;
     HybridAStar *planner;
 
-    Node(const Pose &p, HybridAStar *planner);
-    Node(const Pose &p, HybridAStar *planner, Node *parent);
+    Node(const Pose3d &p, HybridAStar *planner);
+    Node(const Pose3d &p, HybridAStar *planner, Node *parent);
   };
 
   struct CompareNode {
@@ -48,24 +48,43 @@ private:
     bool operator()(Node *a, Node *b) const;
   };
 
+  struct Grad {
+    double x, y;
+
+    Grad();
+    Grad(double x, double y);
+
+    Grad operator*(double scalar);
+    Grad operator+(const Grad &other);
+  };
+
 private:
   std::pair<int, int> worldToMapDiscrete(double x, double y);
   std::pair<double, double> worldToMapContinous(double x, double y);
   std::pair<double, double> mapToWorld(double x, double y);
 
-  State poseToState(const Pose &p);
+  State3d poseToState(const Pose3d &p);
+  
+  State2d pose2dToState2d(const Pose2d &p);
+  Pose2d state2dToPose2d(const State2d &s);
 
   bool isValid(int x, int y);
   int getIndex(int x, int y);
   void preprocess();
   void simulate();
   void smoothen();
-  double distance(const Pose &a, const Pose &b);
   double heuristic(const Node *node);
   bool goalReached(const Node *node);
-  std::vector<Pose> analyticalExpansion(const Node *node);
-  std::vector<std::pair<Pose, double>> expand(const Node *node);
+  std::vector<Pose3d> analyticalExpansion(const Node *node);
+  std::vector<std::pair<Pose3d, double>> expand(const Node *node);
+  double optimizationStep(double w_rho, double w_o, double w_kappa, double w_s,
+                          double alpha, double dmax, double kappa_max);
   
+  double voronoiCost(int idx, double w_rho, double alpha);
+  double obstacleCost(int idx, double w_o, double dmax);
+  double curvatureCost(int idx, double w_kappa, double kappa_max);
+  double smoothnessCost(int idx, double w_s);
+
   void freeNodes();
 
 private:
@@ -76,17 +95,17 @@ private:
   int iterations_;
 
   int height_, width_;
-  Pose start_, end_;
+  Pose3d start_, end_;
 
   nav_msgs::msg::OccupancyGrid::SharedPtr grid_;
   voronoi::VoronoiImage voronoi_;
   ReedShepps reed_shepps_;
   std::vector<double> holonomic_with_obstacle_cost_;
-  std::vector<Pose> plan_;
+  std::vector<Pose3d> plan_;
+  std::vector<Grad> grad_;
 
   std::vector<Node *> nodes_;
   std::vector<std::pair<double, double>> controls_;
-
 
   friend class Node;
 };

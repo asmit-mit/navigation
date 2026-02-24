@@ -87,6 +87,16 @@ double VoronoiImage::distanceToNearestEdge(int x, int y) {
 
 double VoronoiImage::getMaxDist() const { return std::sqrt(max_dist2_); }
 
+std::pair<int, int> VoronoiImage::getNearestObstacle(int x, int y) {
+  Pixel &obstacle = obstacle_feature_vector_[getIndex(x, y)];
+  return {obstacle.x, obstacle.y};
+}
+
+std::pair<int, int> VoronoiImage::getNearestEdge(int x, int y) {
+  Pixel &edge = edge_feature_vector_[getIndex(x, y)];
+  return {edge.x, edge.y};
+}
+
 int VoronoiImage::getIndex(int x, int y) { return y * width_ + x; }
 
 bool VoronoiImage::isBoundary(const std::vector<int8_t> &image_, int x, int y) {
