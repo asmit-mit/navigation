@@ -53,8 +53,17 @@ private:
 
     PathElement()
         : param(0), steering(Steering::STRAIGHT), gear(Gear::FORWARD) {}
-    PathElement(double param, Steering steering, Gear gear)
-        : param(param), steering(steering), gear(gear) {}
+    PathElement(double p, Steering s, Gear g) {
+      if (p >= 0) {
+        param = p;
+        steering = s;
+        gear = g;
+      } else {
+        param = -p;
+        steering = s;
+        gear = (g == Gear::FORWARD) ? Gear::BACKWARD : Gear::FORWARD;
+      }
+    }
   };
 
 private:

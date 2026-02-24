@@ -1,14 +1,10 @@
 #include "planner/hybrid_astar.h"
 #include "utils/math_utils.h"
 
-#include <iostream>
 #include <cmath>
 #include <limits>
 #include <queue>
 #include <unordered_set>
-
-using std::cout;
-using std::endl;
 
 namespace planner {
 
@@ -120,7 +116,6 @@ std::vector<Pose3d> HybridAStar::getPlan() {
   simulate();
   // smoothen();
   freeNodes();
-  cout << plan_.size() << endl;
   return plan_;
 }
 
@@ -244,7 +239,6 @@ void HybridAStar::simulate() {
         curr = curr->parent;
       }
       std::reverse(plan_.begin(), plan_.end());
-      cout << plan_.size() << endl;
       return;
     }
 
@@ -255,8 +249,6 @@ void HybridAStar::simulate() {
 
     std::vector<Pose3d> analytical_expansion = analyticalExpansion(curr);
     if (!analytical_expansion.empty()) {
-      cout << analytical_expansion.size() << endl;
-      cout << curr->pose.x << " " << curr->pose.y << endl;
       while (curr) {
         plan_.push_back(curr->pose);
         curr = curr->parent;
@@ -264,7 +256,6 @@ void HybridAStar::simulate() {
       std::reverse(plan_.begin(), plan_.end());
       plan_.insert(plan_.end(), analytical_expansion.begin(),
                    analytical_expansion.end());
-      cout << plan_.back().x << " " << plan_.back().y << endl;
       return;
     }
 

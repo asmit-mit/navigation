@@ -98,7 +98,7 @@ private:
     planner.setTolerance(0.5, 0.2);
     planner.setStart(start_x, start_y, start_theta);
     planner.setGoal(goal_x, goal_y, goal_theta);
-    planner.setResolutions(0.1, 5);
+    planner.setResolutions(1, 5);
     std::vector<planner::Pose3d> path = planner.getPlan();
 
     if (path.empty()) {
