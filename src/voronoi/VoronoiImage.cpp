@@ -74,7 +74,7 @@ double VoronoiImage::distanceToNearestObstacle(int x, int y) {
     return std::numeric_limits<double>::max();
 
   Pixel nearest = obstacle_feature_vector_[getIndex(x, y)];
-  return std::sqrt(dist2(Pixel(x, y), nearest));
+  return std::sqrt(dist2(Pixel(x, y), nearest)) * grid_->info.resolution;
 }
 
 double VoronoiImage::distanceToNearestEdge(int x, int y) {
@@ -82,10 +82,12 @@ double VoronoiImage::distanceToNearestEdge(int x, int y) {
     return std::numeric_limits<double>::max();
 
   Pixel nearest = edge_feature_vector_[getIndex(x, y)];
-  return std::sqrt(dist2(Pixel(x, y), nearest));
+  return std::sqrt(dist2(Pixel(x, y), nearest)) * grid_->info.resolution;
 }
 
-double VoronoiImage::getMaxDist() const { return std::sqrt(max_dist2_); }
+double VoronoiImage::getMaxDist() const {
+  return std::sqrt(max_dist2_) * grid_->info.resolution;
+}
 
 std::pair<int, int> VoronoiImage::getNearestObstacle(int x, int y) {
   Pixel &obstacle = obstacle_feature_vector_[getIndex(x, y)];
@@ -132,7 +134,6 @@ long long VoronoiImage::dist2(const Pixel &a, const Pixel &b) const {
   long long dy = a.y - b.y;
   return dx * dx + dy * dy;
 }
-
 
 void VoronoiImage::ComputeF0(std::vector<int8_t> &image_,
                              std::vector<Pixel> &feature_vector_,
@@ -256,5 +257,4 @@ bool VoronoiImage::RemoveF2(const Pixel &u, const Pixel &v, const Pixel &w,
 
   return (c * dv - b * du - a * dw - a * b * c) > 0;
 }
-}
-; // namespace voronoi
+}; // namespace voronoi

@@ -94,11 +94,12 @@ private:
     RCLCPP_INFO(this->get_logger(), "Start: %f %f", start_x, start_y);
     RCLCPP_INFO(this->get_logger(), "Goal: %f %f", goal_x, goal_y);
     planner.setGrid(latest_map_);
-    planner.setVelocities(0.5, 0.5);
+    planner.setVelocities(0.5, 2);
     planner.setTolerance(0.5, 0.2);
     planner.setStart(start_x, start_y, start_theta);
     planner.setGoal(goal_x, goal_y, goal_theta);
-    planner.setResolutions(1, 5);
+    planner.setResolutions(0.4, 5);
+    planner.setIterations(500);
     std::vector<planner::Pose3d> path = planner.getPlan();
 
     if (path.empty()) {

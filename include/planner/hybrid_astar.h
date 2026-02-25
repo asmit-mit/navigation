@@ -54,8 +54,8 @@ private:
     Grad();
     Grad(double x, double y);
 
-    Grad operator*(double scalar);
-    Grad operator+(const Grad &other);
+    Grad operator*(double scalar) const;
+    Grad operator+(const Grad &other) const;
   };
 
 private:
@@ -96,6 +96,18 @@ private:
 
   int height_, width_;
   Pose3d start_, end_;
+
+  static constexpr int num_samples_ = 5;
+  static constexpr double step_ = 0.01;
+
+  static constexpr double w_rho_ = 0.05;
+  static constexpr double w_o_ = 0.05;
+  static constexpr double w_kapa_ = 0.01;
+  static constexpr double w_s_ = 0.2;
+
+  static constexpr double alpha_ = 0.1;
+  static constexpr double dmax_ = 3.0;
+  static constexpr double kappa_max_ = 0.01;
 
   nav_msgs::msg::OccupancyGrid::SharedPtr grid_;
   voronoi::VoronoiImage voronoi_;

@@ -14,6 +14,22 @@ double distance(const planner::Pose2d &a, const planner::Pose2d &b) {
   return std::hypot(dx, dy);
 }
 
+double dot(const planner::Pose2d &a, const planner::Pose2d &b) {
+  return a.x * b.x + a.y * b.y;
+}
+
+planner::Pose2d perp(const planner::Pose2d &a, const planner::Pose2d &b) {
+  double mod_b2 = b.norm2();
+
+  if (mod_b2 <= 1e-6)
+    return planner::Pose2d(0, 0);
+
+  double scale = dot(a, b) / mod_b2;
+  planner::Pose2d projection = b * scale;
+
+  return a - projection;
+}
+
 double M(double theta) {
   theta = std::fmod(theta, 2 * M_PI);
 

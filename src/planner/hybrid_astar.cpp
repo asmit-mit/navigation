@@ -2,6 +2,7 @@
 #include "utils/math_utils.h"
 
 #include <cmath>
+#include <iostream>
 #include <limits>
 #include <queue>
 #include <unordered_set>
@@ -41,11 +42,11 @@ HybridAStar::Grad::Grad() {
 
 HybridAStar::Grad::Grad(double x, double y) : x(x), y(y) {}
 
-HybridAStar::Grad HybridAStar::Grad::operator*(double scalar) {
+HybridAStar::Grad HybridAStar::Grad::operator*(double scalar) const {
   return Grad(x * scalar, y * scalar);
 }
 
-HybridAStar::Grad HybridAStar::Grad::operator+(const Grad &other) {
+HybridAStar::Grad HybridAStar::Grad::operator+(const Grad &other) const {
   return Grad(x + other.x, y + other.y);
 }
 
@@ -53,10 +54,10 @@ HybridAStar::HybridAStar() {
   iterations_ = 500;
 
   max_angular_velocity_ = 0.5;
-  max_linear_velocity_ = 2; 
+  max_linear_velocity_ = 2;
 
   angular_resolution_ = 5;
-  distance_resolution_ = 1;
+  distance_resolution_ = 0.5;
 
   angular_tolerance_ = 0.1;
   distance_tolerance_ = 0.5;
@@ -114,7 +115,7 @@ void HybridAStar::setIterations(int iterations) { iterations_ = iterations; }
 
 std::vector<Pose3d> HybridAStar::getPlan() {
   simulate();
-  // smoothen();
+  smoothen();
   freeNodes();
   return plan_;
 }
@@ -284,18 +285,18 @@ void HybridAStar::simulate() {
 }
 
 void HybridAStar::smoothen() {
-  if (plan_.empty())
+  if (plan_.empty() || plan_.size() < 3)
     return;
 
-  grad_.resize(plan_.size());
+  int n = plan_.size();
+  grad_.resize(n);
   for (int i = 0; i < iterations_; i++) {
-    int cost = optimizationStep(1, 1, 1, 1, 1, 1, 1);
-    double step = 0.01;
+    double cost = optimizationStep(0.05, 0.05, 0.01, 0.2, 0.1, 3.0, 0.01);
+    printf("Cost at %d: %f\n", i + 1, cost);
 
-    int n = plan_.size();
     for (int i = 0; i < n; i++) {
-      plan_[i].x -= step * grad_[i].x;
-      plan_[i].y -= step * grad_[i].y;
+      plan_[i].x -= step_ * grad_[i].x;
+      plan_[i].y -= step_ * grad_[i].y;
     }
   }
 }
@@ -307,10 +308,6 @@ std::vector<Pose3d> HybridAStar::analyticalExpansion(const Node *node) {
   if (rs_path.empty())
     return {};
 
-  const double step = distance_resolution_;
-  const double sample_ds = map_resolution_ * 0.2;
-  const int num_samples = std::ceil(step / sample_ds);
-
   for (size_t i = 1; i < rs_path.size(); ++i) {
     const Pose3d &p0 = rs_path[i - 1];
     const Pose3d &p1 = rs_path[i];
@@ -321,8 +318,8 @@ std::vector<Pose3d> HybridAStar::analyticalExpansion(const Node *node) {
         return {};
     }
 
-    for (int j = 1; j <= num_samples; ++j) {
-      double t = static_cast<double>(j) / (num_samples + 1);
+    for (int j = 1; j <= num_samples_; ++j) {
+      double t = static_cast<double>(j) / (num_samples_ + 1);
 
       Pose3d interp;
       interp.x = p0.x + t * (p1.x - p0.x);
@@ -370,9 +367,7 @@ std::vector<std::pair<Pose3d, double>> HybridAStar::expand(const Node *node) {
   std::vector<std::pair<Pose3d, double>> neighbors;
 
   const double step = distance_resolution_;
-  const double sample_ds = map_resolution_ * 0.2;
-  const int num_samples = std::ceil(step / sample_ds);
-  const double ds = step / num_samples;
+  const double ds = step / num_samples_;
 
   const double penalty_steering = 1.05;
   const double penalty_reverse = 3.0;
@@ -381,7 +376,7 @@ std::vector<std::pair<Pose3d, double>> HybridAStar::expand(const Node *node) {
     Pose3d temp = node->pose;
     bool collision = false;
 
-    for (int i = 0; i < num_samples; ++i) {
+    for (int i = 0; i < num_samples_; ++i) {
       temp.x += ds * std::cos(temp.theta) * (u > 0 ? 1.0 : -1.0);
       temp.y += ds * std::sin(temp.theta) * (u > 0 ? 1.0 : -1.0);
 
@@ -427,11 +422,11 @@ double HybridAStar::optimizationStep(double w_rho, double w_o, double w_kappa,
 
   double total_cost = 0.0;
 
-  for (int i = 0; i < n - 1; i++) {
+  for (int i = 0; i < n; i++) {
     total_cost += voronoiCost(i, w_rho, alpha);
     total_cost += obstacleCost(i, w_o, dmax);
     if (i > 0 && i < n - 1) {
-      total_cost += curvatureCost(i, w_kappa, kappa_max);
+      // total_cost += curvatureCost(i, w_kappa, kappa_max);
       total_cost += smoothnessCost(i, w_s);
     }
   }
@@ -452,11 +447,12 @@ double HybridAStar::voronoiCost(int idx, double w_rho, double alpha) {
   State2d vi_state(voronoi_.getNearestEdge(xi_state.x, xi_state.y));
   Pose2d vi_pose(state2dToPose2d(vi_state));
 
-  double dO = voronoi_.distanceToNearestObstacle(xi_state.x, xi_state.y) /
-              map_resolution_;
-  double dV =
-      voronoi_.distanceToNearestEdge(xi_state.x, xi_state.y) / map_resolution_;
-  double dO_max = voronoi_.getMaxDist() / map_resolution_;
+  double dO = voronoi_.distanceToNearestObstacle(xi_state.x, xi_state.y);
+  double dV = voronoi_.distanceToNearestEdge(xi_state.x, xi_state.y);
+  double dO_max = voronoi_.getMaxDist();
+
+  if (dO < 1e-6 || dV < 1e-6)
+    return 0;
 
   double rho = (alpha / (alpha + dO)) * (dV / dO + dV) *
                ((dO - dO_max) / dO_max) * ((dO - dO_max) / dO_max);
@@ -491,8 +487,10 @@ double HybridAStar::obstacleCost(int idx, double w_o, double dmax) {
   State2d oi_state(voronoi_.getNearestObstacle(xi_state.x, xi_state.y));
   Pose2d oi_pose(state2dToPose2d(oi_state));
 
-  double dO = voronoi_.distanceToNearestObstacle(xi_state.x, xi_state.y) /
-              map_resolution_;
+  double dO = voronoi_.distanceToNearestObstacle(xi_state.x, xi_state.y);
+
+  if (dO < 1e-6)
+    return 0;
 
   if (dO > dmax)
     return 0;
@@ -507,9 +505,89 @@ double HybridAStar::obstacleCost(int idx, double w_o, double dmax) {
   return w_o * (dO - dmax) * (dO - dmax);
 }
 
-double HybridAStar::curvatureCost(int idx, double w_kappa, double kappa_max) {}
+double HybridAStar::curvatureCost(int idx, double w_kappa, double kappa_max) {
+  Pose2d xi_minus = Pose2d(plan_[idx - 1]);
+  Pose2d xi = Pose2d(plan_[idx]);
+  Pose2d xi_plus = Pose2d(plan_[idx + 1]);
 
-double HybridAStar::smoothnessCost(int idx, double w_s) {}
+  Pose2d delta_xi = xi - xi_minus;
+  Pose2d delta_xi_plus = xi_plus - xi;
+  double mod_delta_xi = delta_xi.norm();
+  double mod_delta_xi_plus = delta_xi_plus.norm();
+
+  if (mod_delta_xi < 1e-6 || mod_delta_xi_plus < 1e-6)
+    return 0;
+
+  double delta_xiT_xi_plus = utils::dot(delta_xi, delta_xi_plus);
+  double cos_val = std::clamp(
+      (delta_xiT_xi_plus) / (mod_delta_xi * mod_delta_xi_plus), -1.0, 1.0);
+  double delta_phi_i = std::acos(cos_val);
+
+  double kappa_i = delta_phi_i / mod_delta_xi;
+  double delta_kappa = kappa_i - kappa_max;
+
+  if (delta_kappa <= 0)
+    return 0;
+
+  double delta_phi_i_cos_delta_phi_i =
+      -1 / std::sqrt(std::max(1 - cos_val * cos_val, 1e-6));
+
+  Pose2d cos_delta_phi_i_xi_plus =
+      utils::perp(delta_xi, Pose2d(-delta_xi_plus.x, -delta_xi_plus.y)) /
+      (mod_delta_xi * mod_delta_xi_plus);
+  Pose2d cos_delta_phi_i_xi_minus =
+      utils::perp(Pose2d(-delta_xi_plus.x, -delta_xi_plus.y), delta_xi) /
+      (mod_delta_xi * mod_delta_xi_plus);
+  Pose2d cos_delta_phi_i_xi =
+      (cos_delta_phi_i_xi_minus + cos_delta_phi_i_xi_plus) * -1;
+
+  double temp1 = 2 * w_kappa * delta_kappa;
+  double temp2 = (-1 / mod_delta_xi) * delta_phi_i_cos_delta_phi_i;
+  double temp3 = delta_phi_i / delta_xi.norm2();
+  Pose2d normalized_delta_xi = delta_xi.normalized();
+
+  Grad ki_xi, ki_xi_minus, ki_xi_plus;
+  ki_xi.x = temp2 * cos_delta_phi_i_xi.x - temp3 * normalized_delta_xi.x;
+  ki_xi.y = temp2 * cos_delta_phi_i_xi.y - temp3 * normalized_delta_xi.y;
+
+  ki_xi_minus.x =
+      temp2 * cos_delta_phi_i_xi_minus.x + temp3 * normalized_delta_xi.x;
+  ki_xi_minus.y =
+      temp2 * cos_delta_phi_i_xi_minus.y + temp3 * normalized_delta_xi.y;
+
+  ki_xi_plus.x = temp2 * cos_delta_phi_i_xi_plus.x;
+  ki_xi_plus.y = temp2 * cos_delta_phi_i_xi_plus.y;
+
+  grad_[idx - 1].x += temp1 * ki_xi_minus.x;
+  grad_[idx - 1].y += temp1 * ki_xi_minus.y;
+
+  grad_[idx].x += temp1 * ki_xi.x;
+  grad_[idx].y += temp1 * ki_xi.y;
+
+  grad_[idx + 1].x += temp1 * ki_xi_plus.x;
+  grad_[idx + 1].y += temp1 * ki_xi_plus.y;
+
+  return w_kappa * delta_kappa * delta_kappa;
+}
+
+double HybridAStar::smoothnessCost(int idx, double w_s) {
+  Pose2d xi_minus = Pose2d(plan_[idx - 1]);
+  Pose2d xi = Pose2d(plan_[idx]);
+  Pose2d xi_plus = Pose2d(plan_[idx + 1]);
+
+  Pose2d delta = xi_plus - xi * 2 + xi_minus;
+
+  grad_[idx - 1].x += 2 * w_s * delta.x;
+  grad_[idx - 1].y += 2 * w_s * delta.y;
+
+  grad_[idx].x += -4 * w_s * delta.x;
+  grad_[idx].y += -4 * w_s * delta.y;
+
+  grad_[idx + 1].x += 2 * w_s * delta.x;
+  grad_[idx + 1].y += 2 * w_s * delta.y;
+
+  return w_s * delta.norm2();
+}
 
 void HybridAStar::freeNodes() {
   for (int i = 0; i < (int)nodes_.size(); i++)
