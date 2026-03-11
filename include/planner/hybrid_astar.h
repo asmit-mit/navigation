@@ -19,6 +19,7 @@ public:
   void setStart(double x, double y, double theta);
   void setGoal(double x, double y, double theta);
   void setIterations(int iterations);
+  void setWeights(double rho, double obs, double curv, double smooth);
   std::vector<Pose3d> getPlan();
 
 private:
@@ -77,8 +78,7 @@ private:
   bool goalReached(const Node *node);
   std::vector<Pose3d> analyticalExpansion(const Node *node);
   std::vector<std::pair<Pose3d, double>> expand(const Node *node);
-  double optimizationStep(double w_rho, double w_o, double w_kappa, double w_s,
-                          double alpha, double dmax, double kappa_max);
+  double optimizationStep();
   
   double voronoiCost(int idx, double w_rho, double alpha);
   double obstacleCost(int idx, double w_o, double dmax);
@@ -97,17 +97,17 @@ private:
   int height_, width_;
   Pose3d start_, end_;
 
+  double w_rho_;
+  double w_o_;
+  double w_kappa_;
+  double w_s_;
+
   static constexpr int num_samples_ = 5;
-  static constexpr double step_ = 0.01;
+  static constexpr double step_ = 0.0001;
 
-  static constexpr double w_rho_ = 0.05;
-  static constexpr double w_o_ = 0.05;
-  static constexpr double w_kapa_ = 0.01;
-  static constexpr double w_s_ = 0.2;
-
-  static constexpr double alpha_ = 0.1;
-  static constexpr double dmax_ = 3.0;
-  static constexpr double kappa_max_ = 0.01;
+  static constexpr double alpha_ = 0.01;
+  static constexpr double dmax_ = 1.0;
+  static constexpr double kappa_max_ = 2.0;
 
   nav_msgs::msg::OccupancyGrid::SharedPtr grid_;
   voronoi::VoronoiImage voronoi_;

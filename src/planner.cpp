@@ -50,66 +50,89 @@ private:
   }
 
   void goalCallback(const geometry_msgs::msg::PoseStamped::SharedPtr msg) {
-
-    if (!have_start_) {
-      start_pose_ = msg;
-      have_start_ = true;
-      RCLCPP_INFO(this->get_logger(), "Start pose received");
-      return;
-    }
-
-    if (!have_goal_) {
-      goal_pose_ = msg;
-      have_goal_ = true;
-      RCLCPP_INFO(this->get_logger(), "Goal pose received");
-      return;
-    }
-
-    start_pose_ = goal_pose_;
-    goal_pose_ = msg;
-
-    RCLCPP_INFO(this->get_logger(), "Updated start and goal");
+    // if (!have_start_) {
+    //   start_pose_ = msg;
+    //   have_start_ = true;
+    //   RCLCPP_INFO(this->get_logger(), "Start pose received");
+    //   return;
+    // }
+    //
+    // if (!have_goal_) {
+    //   goal_pose_ = msg;
+    //   have_goal_ = true;
+    //   RCLCPP_INFO(this->get_logger(), "Goal pose received");
+    //   return;
+    // }
+    //
+    // start_pose_ = goal_pose_;
+    // goal_pose_ = msg;
+    //
+    // RCLCPP_INFO(this->get_logger(), "Updated start and goal");
   }
 
   void timerCallback() {
-    if (!latest_map_ || !have_start_ || !have_goal_)
-      return;
+    // if (!latest_map_ || !have_start_ || !have_goal_)
+    //   return;
 
-    double start_x = start_pose_->pose.position.x;
-    double start_y = start_pose_->pose.position.y;
+    start_pose_.pose.position.x = -1.58714;
+    start_pose_.pose.position.y = 0.491547;
+    start_pose_.pose.orientation.x = 0;
+    start_pose_.pose.orientation.y = 0;
+    start_pose_.pose.orientation.z = 0;
+    start_pose_.pose.orientation.w = 1;
+
+    goal_pose_.pose.position.x = -0.41513;
+    goal_pose_.pose.position.y = -3.29784;
+    goal_pose_.pose.orientation.x = 0;
+    goal_pose_.pose.orientation.y = 0;
+    goal_pose_.pose.orientation.z = 0.986706;
+    goal_pose_.pose.orientation.w = 0.162517;
+
+    double start_x = start_pose_.pose.position.x;
+    double start_y = start_pose_.pose.position.y;
 
     tf2::Quaternion q_start;
-    tf2::fromMsg(start_pose_->pose.orientation, q_start);
+    tf2::fromMsg(start_pose_.pose.orientation, q_start);
     double roll, pitch, start_theta;
     tf2::Matrix3x3(q_start).getRPY(roll, pitch, start_theta);
 
-    double goal_x = goal_pose_->pose.position.x;
-    double goal_y = goal_pose_->pose.position.y;
+    double goal_x = goal_pose_.pose.position.x;
+    double goal_y = goal_pose_.pose.position.y;
 
     tf2::Quaternion q_goal;
-    tf2::fromMsg(goal_pose_->pose.orientation, q_goal);
+    tf2::fromMsg(goal_pose_.pose.orientation, q_goal);
     double goal_theta;
     tf2::Matrix3x3(q_goal).getRPY(roll, pitch, goal_theta);
 
-    RCLCPP_INFO(this->get_logger(), "Start: %f %f", start_x, start_y);
-    RCLCPP_INFO(this->get_logger(), "Goal: %f %f", goal_x, goal_y);
+    // RCLCPP_INFO(this->get_logger(), "Start: %f %f", start_x, start_y);
+    // RCLCPP_INFO(this->get_logger(), "Goal: %f %f", goal_x, goal_y);
     planner.setGrid(latest_map_);
     planner.setVelocities(0.5, 2);
     planner.setTolerance(0.5, 0.2);
     planner.setStart(start_x, start_y, start_theta);
     planner.setGoal(goal_x, goal_y, goal_theta);
-    planner.setResolutions(0.4, 5);
-    planner.setIterations(500);
+    planner.setResolutions(0.1, 5);
+    planner.setIterations(2000);
+
+    auto start = std::chrono::steady_clock::now();
+
     std::vector<planner::Pose3d> path = planner.getPlan();
 
+    auto end = std::chrono::steady_clock::now();
+
+    double time_ms =
+        std::chrono::duration<double, std::milli>(end - start).count();
+
+    std::cout << "Planning time: " << time_ms << " ms\n";
+
     if (path.empty()) {
-      RCLCPP_WARN(this->get_logger(), "No path found");
+      // RCLCPP_WARN(this->get_logger(), "No path found");
       return;
     }
 
     nav_msgs::msg::Path ros_path;
     ros_path.header.stamp = this->now();
-    ros_path.header.frame_id = "odom";
+    ros_path.header.frame_id = "map";
 
     for (const auto &pose : path) {
       geometry_msgs::msg::PoseStamped pose_stamped;
@@ -128,8 +151,8 @@ private:
 
     path_pub_->publish(ros_path);
 
-    RCLCPP_INFO(this->get_logger(), "Path published (%ld poses)",
-                ros_path.poses.size());
+    // RCLCPP_INFO(this->get_logger(), "Path published (%ld poses)",
+    //             ros_path.poses.size());
   }
 
 private:
@@ -143,13 +166,13 @@ private:
 
   nav_msgs::msg::OccupancyGrid::SharedPtr latest_map_;
 
-  geometry_msgs::msg::PoseStamped::SharedPtr start_pose_;
-  geometry_msgs::msg::PoseStamped::SharedPtr goal_pose_;
+  geometry_msgs::msg::PoseStamped start_pose_;
+  geometry_msgs::msg::PoseStamped goal_pose_;
 
   planner::HybridAStar planner;
 
-  bool have_start_ = false;
-  bool have_goal_ = false;
+  // bool have_start_ = false;
+  // bool have_goal_ = false;
 };
 
 int main(int argc, char *argv[]) {

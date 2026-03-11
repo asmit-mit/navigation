@@ -7,6 +7,9 @@
 #include <queue>
 #include <unordered_set>
 
+using std::cout;
+using std::endl;
+
 namespace planner {
 
 HybridAStar::Node::Node(const Pose3d &p, HybridAStar *planner)
@@ -62,6 +65,11 @@ HybridAStar::HybridAStar() {
   angular_tolerance_ = 0.1;
   distance_tolerance_ = 0.5;
 
+  w_rho_ = 0.1;
+  w_o_ = 0.05;
+  w_kappa_ = 0.1;
+  w_s_ = 0.01;
+
   reed_shepps_.setDistanceResolution(distance_resolution_);
   reed_shepps_.setMinTurningRadius(1);
 }
@@ -112,6 +120,14 @@ void HybridAStar::setStart(double x, double y, double theta) {
 }
 
 void HybridAStar::setIterations(int iterations) { iterations_ = iterations; }
+
+void HybridAStar::setWeights(double rho, double obs, double curv,
+                             double smooth) {
+  w_rho_ = rho;
+  w_o_ = obs;
+  w_kappa_ = curv;
+  w_s_ = smooth;
+}
 
 std::vector<Pose3d> HybridAStar::getPlan() {
   simulate();
@@ -290,13 +306,15 @@ void HybridAStar::smoothen() {
 
   int n = plan_.size();
   grad_.resize(n);
-  for (int i = 0; i < iterations_; i++) {
-    double cost = optimizationStep(0.05, 0.05, 0.01, 0.2, 0.1, 3.0, 0.01);
-    printf("Cost at %d: %f\n", i + 1, cost);
 
-    for (int i = 0; i < n; i++) {
-      plan_[i].x -= step_ * grad_[i].x;
-      plan_[i].y -= step_ * grad_[i].y;
+  for (int i = 0; i < iterations_; i++) {
+    double cost = optimizationStep();
+    // if ((i + 1) % 100 == 0)
+    // printf("Cost at %d: %f\n", i + 1, cost);
+
+    for (int j = 0; j < n; j++) {
+      plan_[j].x -= step_ * grad_[j].x;
+      plan_[j].y -= step_ * grad_[j].y;
     }
   }
 }
@@ -410,9 +428,7 @@ std::vector<std::pair<Pose3d, double>> HybridAStar::expand(const Node *node) {
   return neighbors;
 }
 
-double HybridAStar::optimizationStep(double w_rho, double w_o, double w_kappa,
-                                     double w_s, double alpha, double dmax,
-                                     double kappa_max) {
+double HybridAStar::optimizationStep() {
   const int n = plan_.size();
 
   for (Grad &g : grad_) {
@@ -423,11 +439,11 @@ double HybridAStar::optimizationStep(double w_rho, double w_o, double w_kappa,
   double total_cost = 0.0;
 
   for (int i = 0; i < n; i++) {
-    total_cost += voronoiCost(i, w_rho, alpha);
-    total_cost += obstacleCost(i, w_o, dmax);
+    total_cost += voronoiCost(i, w_rho_, alpha_);
+    total_cost += obstacleCost(i, w_o_, dmax_);
     if (i > 0 && i < n - 1) {
-      // total_cost += curvatureCost(i, w_kappa, kappa_max);
-      total_cost += smoothnessCost(i, w_s);
+      total_cost += curvatureCost(i, w_kappa_, kappa_max_);
+      total_cost += smoothnessCost(i, w_s_);
     }
   }
 
@@ -451,6 +467,9 @@ double HybridAStar::voronoiCost(int idx, double w_rho, double alpha) {
   double dV = voronoi_.distanceToNearestEdge(xi_state.x, xi_state.y);
   double dO_max = voronoi_.getMaxDist();
 
+  dO = std::max(dO, 0.05);
+  dV = std::max(dV, 0.05);
+
   if (dO < 1e-6 || dV < 1e-6)
     return 0;
 
@@ -473,7 +492,7 @@ double HybridAStar::voronoiCost(int idx, double w_rho, double alpha) {
   dv_xi.x = (xi_pose.x - vi_pose.x) / dV;
   dv_xi.y = (xi_pose.y - vi_pose.y) / dV;
 
-  Grad pv_xi = do_xi * pv_do + dv_xi * pv_dv;
+  Grad pv_xi = (do_xi * pv_do) + (dv_xi * pv_dv);
   grad_[idx].x += w_rho * pv_xi.x;
   grad_[idx].y += w_rho * pv_xi.y;
 
@@ -505,69 +524,35 @@ double HybridAStar::obstacleCost(int idx, double w_o, double dmax) {
   return w_o * (dO - dmax) * (dO - dmax);
 }
 
-double HybridAStar::curvatureCost(int idx, double w_kappa, double kappa_max) {
-  Pose2d xi_minus = Pose2d(plan_[idx - 1]);
-  Pose2d xi = Pose2d(plan_[idx]);
-  Pose2d xi_plus = Pose2d(plan_[idx + 1]);
+double HybridAStar::curvatureCost(int i, double w_kappa, double kappa_max) {
+  const Pose2d &p0 = plan_[i - 1];
+  const Pose2d &p1 = plan_[i];
+  const Pose2d &p2 = plan_[i + 1];
 
-  Pose2d delta_xi = xi - xi_minus;
-  Pose2d delta_xi_plus = xi_plus - xi;
-  double mod_delta_xi = delta_xi.norm();
-  double mod_delta_xi_plus = delta_xi_plus.norm();
+  double dx1 = p1.x - p0.x;
+  double dy1 = p1.y - p0.y;
 
-  if (mod_delta_xi < 1e-6 || mod_delta_xi_plus < 1e-6)
-    return 0;
+  double dx2 = p2.x - p1.x;
+  double dy2 = p2.y - p1.y;
 
-  double delta_xiT_xi_plus = utils::dot(delta_xi, delta_xi_plus);
-  double cos_val = std::clamp(
-      (delta_xiT_xi_plus) / (mod_delta_xi * mod_delta_xi_plus), -1.0, 1.0);
-  double delta_phi_i = std::acos(cos_val);
+  double dx3 = p2.x - p0.x;
+  double dy3 = p2.y - p0.y;
 
-  double kappa_i = delta_phi_i / mod_delta_xi;
-  double delta_kappa = kappa_i - kappa_max;
+  double a = std::hypot(dx1, dy1);
+  double b = std::hypot(dx2, dy2);
+  double c = std::hypot(dx3, dy3);
 
-  if (delta_kappa <= 0)
-    return 0;
+  if (a < 1e-6 || b < 1e-6 || c < 1e-6)
+    return 0.0;
 
-  double delta_phi_i_cos_delta_phi_i =
-      -1 / std::sqrt(std::max(1 - cos_val * cos_val, 1e-6));
+  double cross = dx1 * dy2 - dy1 * dx2;
+  double kappa = 2.0 * std::abs(cross) / (a * b * c);
 
-  Pose2d cos_delta_phi_i_xi_plus =
-      utils::perp(delta_xi, Pose2d(-delta_xi_plus.x, -delta_xi_plus.y)) /
-      (mod_delta_xi * mod_delta_xi_plus);
-  Pose2d cos_delta_phi_i_xi_minus =
-      utils::perp(Pose2d(-delta_xi_plus.x, -delta_xi_plus.y), delta_xi) /
-      (mod_delta_xi * mod_delta_xi_plus);
-  Pose2d cos_delta_phi_i_xi =
-      (cos_delta_phi_i_xi_minus + cos_delta_phi_i_xi_plus) * -1;
+  double diff = kappa - kappa_max;
+  if (diff <= 0)
+    return 0.0;
 
-  double temp1 = 2 * w_kappa * delta_kappa;
-  double temp2 = (-1 / mod_delta_xi) * delta_phi_i_cos_delta_phi_i;
-  double temp3 = delta_phi_i / delta_xi.norm2();
-  Pose2d normalized_delta_xi = delta_xi.normalized();
-
-  Grad ki_xi, ki_xi_minus, ki_xi_plus;
-  ki_xi.x = temp2 * cos_delta_phi_i_xi.x - temp3 * normalized_delta_xi.x;
-  ki_xi.y = temp2 * cos_delta_phi_i_xi.y - temp3 * normalized_delta_xi.y;
-
-  ki_xi_minus.x =
-      temp2 * cos_delta_phi_i_xi_minus.x + temp3 * normalized_delta_xi.x;
-  ki_xi_minus.y =
-      temp2 * cos_delta_phi_i_xi_minus.y + temp3 * normalized_delta_xi.y;
-
-  ki_xi_plus.x = temp2 * cos_delta_phi_i_xi_plus.x;
-  ki_xi_plus.y = temp2 * cos_delta_phi_i_xi_plus.y;
-
-  grad_[idx - 1].x += temp1 * ki_xi_minus.x;
-  grad_[idx - 1].y += temp1 * ki_xi_minus.y;
-
-  grad_[idx].x += temp1 * ki_xi.x;
-  grad_[idx].y += temp1 * ki_xi.y;
-
-  grad_[idx + 1].x += temp1 * ki_xi_plus.x;
-  grad_[idx + 1].y += temp1 * ki_xi_plus.y;
-
-  return w_kappa * delta_kappa * delta_kappa;
+  return w_kappa * diff * diff;
 }
 
 double HybridAStar::smoothnessCost(int idx, double w_s) {
