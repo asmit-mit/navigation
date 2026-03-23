@@ -25,6 +25,10 @@ add_executable(planner
   src/planner/state.cpp
   src/planner/hybrid_astar.cpp
   src/planner/reed_shepps.cpp
+  src/planner/dubins.cpp
+  src/planner/motion_model.cpp
+  src/planner/grid_map.cpp
+  src/planner/optimizer.cpp
 
   src/utils/math_utils.cpp)
 target_include_directories(planner PUBLIC

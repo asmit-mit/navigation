@@ -1,10 +1,11 @@
 #include <nav_msgs/msg/detail/occupancy_grid__struct.hpp>
 #include <vector>
 
+#include "planner/grid_map.h"
+#include "planner/motion_model.h"
+#include "planner/optimizer.h"
 #include "planner/pose.h"
-#include "planner/reed_shepps.h"
 #include "planner/state.h"
-#include "voronoi/VoronoiImage.h"
 
 namespace planner {
 
@@ -12,6 +13,7 @@ class HybridAStar {
 public:
   HybridAStar();
 
+  void setMotionModel(MotionModelType type);
   void setGrid(nav_msgs::msg::OccupancyGrid::SharedPtr grid);
   void setTolerance(double angle, double distance);
   void setResolutions(double distance, double angle);
@@ -19,8 +21,7 @@ public:
   void setStart(double x, double y, double theta);
   void setGoal(double x, double y, double theta);
   void setIterations(int iterations);
-  void setWeights(double rho, double obs, double curv, double smooth);
-  std::vector<Pose3d> getPlan();
+  std::vector<Pose2d> getPlan();
 
 private:
   class Node {
@@ -49,72 +50,45 @@ private:
     bool operator()(Node *a, Node *b) const;
   };
 
-  struct Grad {
-    double x, y;
-
-    Grad();
-    Grad(double x, double y);
-
-    Grad operator*(double scalar) const;
-    Grad operator+(const Grad &other) const;
-  };
-
 private:
-  std::pair<int, int> worldToMapDiscrete(double x, double y);
-  std::pair<double, double> worldToMapContinous(double x, double y);
-  std::pair<double, double> mapToWorld(double x, double y);
-
   State3d poseToState(const Pose3d &p);
-  
   State2d pose2dToState2d(const Pose2d &p);
   Pose2d state2dToPose2d(const State2d &s);
 
-  bool isValid(int x, int y);
-  int getIndex(int x, int y);
   void preprocess();
   void simulate();
-  void smoothen();
   double heuristic(const Node *node);
   bool goalReached(const Node *node);
   std::vector<Pose3d> analyticalExpansion(const Node *node);
   std::vector<std::pair<Pose3d, double>> expand(const Node *node);
-  double optimizationStep();
-  
-  double voronoiCost(int idx, double w_rho, double alpha);
-  double obstacleCost(int idx, double w_o, double dmax);
-  double curvatureCost(int idx, double w_kappa, double kappa_max);
-  double smoothnessCost(int idx, double w_s);
 
   void freeNodes();
 
 private:
   double map_resolution_;
+  int height_, width_;
+
   double angular_resolution_, distance_resolution_;
   double angular_tolerance_, distance_tolerance_;
   double max_linear_velocity_, max_angular_velocity_;
-  int iterations_;
 
-  int height_, width_;
   Pose3d start_, end_;
 
-  double w_rho_;
-  double w_o_;
-  double w_kappa_;
-  double w_s_;
-
   static constexpr int num_samples_ = 5;
-  static constexpr double step_ = 0.0001;
 
-  static constexpr double alpha_ = 0.01;
-  static constexpr double dmax_ = 1.0;
-  static constexpr double kappa_max_ = 2.0;
+  static constexpr int dx_[8] = {-1, 1, -1, 0, 1, -1, 0, 1};
+  static constexpr int dy_[8] = {0, 0, 1, 1, 1, -1, -1, -1};
 
-  nav_msgs::msg::OccupancyGrid::SharedPtr grid_;
-  voronoi::VoronoiImage voronoi_;
-  ReedShepps reed_shepps_;
+  static constexpr double penalty_steering_ = 1.05;
+  static constexpr double penalty_change_steering_ = 1.5;
+  static constexpr double penalty_reverse_ = 3.0;
+
+  MotionModel motion_model_;
+  GridMap grid_;
+  Optimizer optimizer_;
+
   std::vector<double> holonomic_with_obstacle_cost_;
-  std::vector<Pose3d> plan_;
-  std::vector<Grad> grad_;
+  std::vector<Pose2d> plan_;
 
   std::vector<Node *> nodes_;
   std::vector<std::pair<double, double>> controls_;

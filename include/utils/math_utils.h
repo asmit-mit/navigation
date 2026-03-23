@@ -17,6 +17,8 @@ double M(double theta);
 std::pair<double, double> R(double x, double y);
 planner::Pose3d changeOfBasis(const planner::Pose3d &p1,
                               const planner::Pose3d &p2);
+double mod2pi(double x);
+
 double rad2deg(double rad);
 double deg2rad(double deg);
 int sign(int x);

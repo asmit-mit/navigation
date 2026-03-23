@@ -2,23 +2,12 @@
 
 #include <array>
 #include <cmath>
-#include <utility>
 #include <vector>
 
+#include "planner/motion_states.h"
 #include "planner/pose.h"
 
 namespace planner {
-
-enum class Steering {
-  LEFT = -1,
-  RIGHT = 1,
-  STRAIGHT = 0,
-};
-
-enum class Gear {
-  FORWARD = 1,
-  BACKWARD = -1,
-};
 
 class ReedShepps {
 public:

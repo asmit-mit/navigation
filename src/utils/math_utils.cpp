@@ -61,6 +61,13 @@ planner::Pose3d changeOfBasis(const planner::Pose3d &p1,
   return planner::Pose3d(new_x, new_y, new_theta);
 }
 
+double mod2pi(double x) {
+  x = fmod(x, 2 * M_PI);
+  if (x < 0)
+    x += 2 * M_PI;
+  return x;
+}
+
 double rad2deg(double rad) { return 180 * rad / M_PI; }
 
 double deg2rad(double deg) { return M_PI * deg / 180; }

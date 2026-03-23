@@ -7,7 +7,10 @@
 
 namespace planner {
 
-ReedShepps::ReedShepps() {}
+ReedShepps::ReedShepps() {
+  distance_tolerance_ = 0.1;
+  angular_tolerance_ = 0.1;
+}
 
 void ReedShepps::setDistanceResolution(double resolution) {
   distance_resolution_ = resolution;
