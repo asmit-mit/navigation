@@ -112,14 +112,6 @@ std::vector<Pose2d> HybridAStar::getPlan() {
   return plan_;
 }
 
-State2d HybridAStar::pose2dToState2d(const Pose2d &p) {
-  return State2d(grid_.worldToMapDiscrete(p.x, p.y));
-}
-
-Pose2d HybridAStar::state2dToPose2d(const State2d &s) {
-  return Pose2d(grid_.mapToWorld(s.x, s.y));
-}
-
 State3d HybridAStar::poseToState(const Pose3d &p) {
   auto [x, y] = grid_.worldToMapDiscrete(p.x, p.y);
 

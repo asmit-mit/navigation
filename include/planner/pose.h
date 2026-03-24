@@ -1,6 +1,7 @@
 #pragma once
 
 #include <utility>
+
 namespace planner {
 
 struct Pose3d {

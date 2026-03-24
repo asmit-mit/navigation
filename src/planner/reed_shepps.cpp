@@ -35,7 +35,6 @@ void ReedShepps::simulate(const Pose3d &start, const Pose3d &end) {
     return;
   }
 
-
   optimal_path_dist_ = std::numeric_limits<double>::infinity();
   optimal_path_.clear();
 
@@ -103,6 +102,25 @@ std::vector<Pose3d> ReedShepps::getOptimalPath() {
   return poses;
 }
 
+void ReedShepps::tryPath(double dist, std::vector<PathElement> candidate,
+                         bool timeflip, bool reflect) {
+  if (!std::isfinite(dist) || dist >= optimal_path_dist_)
+    return;
+
+  if (reflect) {
+    for (auto &e : candidate)
+      e.reverseSteering();
+  }
+
+  if (timeflip) {
+    for (auto &e : candidate)
+      e.reverseGear();
+  }
+
+  optimal_path_dist_ = dist;
+  optimal_path_ = std::move(candidate);
+}
+
 void ReedShepps::path1(const Pose3d &p, bool timeflip, bool reflect) {
   double phi = p.theta;
   auto [u, t] = utils::R(p.x - std::sin(phi), p.y - 1 + std::cos(phi));
@@ -115,20 +133,7 @@ void ReedShepps::path1(const Pose3d &p, bool timeflip, bool reflect) {
   path.emplace_back(PathElement(u, Steering::STRAIGHT, Gear::FORWARD));
   path.emplace_back(PathElement(v, Steering::LEFT, Gear::FORWARD));
 
-  if (timeflip) {
-    for (int i = 0; i < (int)path.size(); i++)
-      path[i].reverseGear();
-  }
-
-  if (reflect) {
-    for (int i = 0; i < (int)path.size(); i++)
-      path[i].reverseSteering();
-  }
-
-  if (dist < optimal_path_dist_) {
-    optimal_path_dist_ = dist;
-    optimal_path_ = path;
-  }
+  tryPath(dist, std::move(path), timeflip, reflect);
 }
 
 void ReedShepps::path2(const Pose3d &p, bool timeflip, bool reflect) {
@@ -149,20 +154,7 @@ void ReedShepps::path2(const Pose3d &p, bool timeflip, bool reflect) {
   path.emplace_back(PathElement(u, Steering::STRAIGHT, Gear::FORWARD));
   path.emplace_back(PathElement(v, Steering::RIGHT, Gear::FORWARD));
 
-  if (timeflip) {
-    for (int i = 0; i < (int)path.size(); i++)
-      path[i].reverseGear();
-  }
-
-  if (reflect) {
-    for (int i = 0; i < (int)path.size(); i++)
-      path[i].reverseSteering();
-  }
-
-  if (dist < optimal_path_dist_) {
-    optimal_path_dist_ = dist;
-    optimal_path_ = path;
-  }
+  tryPath(dist, std::move(path), timeflip, reflect);
 }
 
 void ReedShepps::path3(const Pose3d &p, bool timeflip, bool reflect) {
@@ -186,20 +178,7 @@ void ReedShepps::path3(const Pose3d &p, bool timeflip, bool reflect) {
   path.emplace_back(PathElement(u, Steering::RIGHT, Gear::BACKWARD));
   path.emplace_back(PathElement(v, Steering::LEFT, Gear::FORWARD));
 
-  if (timeflip) {
-    for (int i = 0; i < (int)path.size(); i++)
-      path[i].reverseGear();
-  }
-
-  if (reflect) {
-    for (int i = 0; i < (int)path.size(); i++)
-      path[i].reverseSteering();
-  }
-
-  if (dist < optimal_path_dist_) {
-    optimal_path_dist_ = dist;
-    optimal_path_ = path;
-  }
+  tryPath(dist, std::move(path), timeflip, reflect);
 }
 
 void ReedShepps::path4(const Pose3d &p, bool timeflip, bool reflect) {
@@ -223,20 +202,7 @@ void ReedShepps::path4(const Pose3d &p, bool timeflip, bool reflect) {
   path.emplace_back(PathElement(u, Steering::RIGHT, Gear::BACKWARD));
   path.emplace_back(PathElement(v, Steering::LEFT, Gear::BACKWARD));
 
-  if (timeflip) {
-    for (int i = 0; i < (int)path.size(); i++)
-      path[i].reverseGear();
-  }
-
-  if (reflect) {
-    for (int i = 0; i < (int)path.size(); i++)
-      path[i].reverseSteering();
-  }
-
-  if (dist < optimal_path_dist_) {
-    optimal_path_dist_ = dist;
-    optimal_path_ = path;
-  }
+  tryPath(dist, std::move(path), timeflip, reflect);
 }
 
 void ReedShepps::path5(const Pose3d &p, bool timeflip, bool reflect) {
@@ -260,20 +226,7 @@ void ReedShepps::path5(const Pose3d &p, bool timeflip, bool reflect) {
   path.emplace_back(PathElement(u, Steering::RIGHT, Gear::FORWARD));
   path.emplace_back(PathElement(v, Steering::LEFT, Gear::BACKWARD));
 
-  if (timeflip) {
-    for (int i = 0; i < (int)path.size(); i++)
-      path[i].reverseGear();
-  }
-
-  if (reflect) {
-    for (int i = 0; i < (int)path.size(); i++)
-      path[i].reverseSteering();
-  }
-
-  if (dist < optimal_path_dist_) {
-    optimal_path_dist_ = dist;
-    optimal_path_ = path;
-  }
+  tryPath(dist, std::move(path), timeflip, reflect);
 }
 
 void ReedShepps::path6(const Pose3d &p, bool timeflip, bool reflect) {
@@ -306,20 +259,7 @@ void ReedShepps::path6(const Pose3d &p, bool timeflip, bool reflect) {
   path.emplace_back(PathElement(u, Steering::LEFT, Gear::BACKWARD));
   path.emplace_back(PathElement(v, Steering::RIGHT, Gear::BACKWARD));
 
-  if (timeflip) {
-    for (int i = 0; i < (int)path.size(); i++)
-      path[i].reverseGear();
-  }
-
-  if (reflect) {
-    for (int i = 0; i < (int)path.size(); i++)
-      path[i].reverseSteering();
-  }
-
-  if (dist < optimal_path_dist_) {
-    optimal_path_dist_ = dist;
-    optimal_path_ = path;
-  }
+  tryPath(dist, std::move(path), timeflip, reflect);
 }
 
 void ReedShepps::path7(const Pose3d &p, bool timeflip, bool reflect) {
@@ -348,20 +288,7 @@ void ReedShepps::path7(const Pose3d &p, bool timeflip, bool reflect) {
   path.emplace_back(PathElement(u, Steering::LEFT, Gear::BACKWARD));
   path.emplace_back(PathElement(v, Steering::RIGHT, Gear::FORWARD));
 
-  if (timeflip) {
-    for (int i = 0; i < (int)path.size(); i++)
-      path[i].reverseGear();
-  }
-
-  if (reflect) {
-    for (int i = 0; i < (int)path.size(); i++)
-      path[i].reverseSteering();
-  }
-
-  if (dist < optimal_path_dist_) {
-    optimal_path_dist_ = dist;
-    optimal_path_ = path;
-  }
+  tryPath(dist, std::move(path), timeflip, reflect);
 }
 
 void ReedShepps::path8(const Pose3d &p, bool timeflip, bool reflect) {
@@ -386,20 +313,7 @@ void ReedShepps::path8(const Pose3d &p, bool timeflip, bool reflect) {
   path.emplace_back(PathElement(u, Steering::STRAIGHT, Gear::BACKWARD));
   path.emplace_back(PathElement(v, Steering::LEFT, Gear::BACKWARD));
 
-  if (timeflip) {
-    for (int i = 0; i < (int)path.size(); i++)
-      path[i].reverseGear();
-  }
-
-  if (reflect) {
-    for (int i = 0; i < (int)path.size(); i++)
-      path[i].reverseSteering();
-  }
-
-  if (dist < optimal_path_dist_) {
-    optimal_path_dist_ = dist;
-    optimal_path_ = path;
-  }
+  tryPath(dist, std::move(path), timeflip, reflect);
 }
 
 void ReedShepps::path9(const Pose3d &p, bool timeflip, bool reflect) {
@@ -424,20 +338,7 @@ void ReedShepps::path9(const Pose3d &p, bool timeflip, bool reflect) {
   path.emplace_back(PathElement(M_PI_2, Steering::RIGHT, Gear::FORWARD));
   path.emplace_back(PathElement(v, Steering::LEFT, Gear::BACKWARD));
 
-  if (timeflip) {
-    for (int i = 0; i < (int)path.size(); i++)
-      path[i].reverseGear();
-  }
-
-  if (reflect) {
-    for (int i = 0; i < (int)path.size(); i++)
-      path[i].reverseSteering();
-  }
-
-  if (dist < optimal_path_dist_) {
-    optimal_path_dist_ = dist;
-    optimal_path_ = path;
-  }
+  tryPath(dist, std::move(path), timeflip, reflect);
 }
 
 void ReedShepps::path10(const Pose3d &p, bool timeflip, bool reflect) {
@@ -461,20 +362,7 @@ void ReedShepps::path10(const Pose3d &p, bool timeflip, bool reflect) {
   path.emplace_back(PathElement(u, Steering::STRAIGHT, Gear::BACKWARD));
   path.emplace_back(PathElement(v, Steering::RIGHT, Gear::BACKWARD));
 
-  if (timeflip) {
-    for (int i = 0; i < (int)path.size(); i++)
-      path[i].reverseGear();
-  }
-
-  if (reflect) {
-    for (int i = 0; i < (int)path.size(); i++)
-      path[i].reverseSteering();
-  }
-
-  if (dist < optimal_path_dist_) {
-    optimal_path_dist_ = dist;
-    optimal_path_ = path;
-  }
+  tryPath(dist, std::move(path), timeflip, reflect);
 }
 
 void ReedShepps::path11(const Pose3d &p, bool timeflip, bool reflect) {
@@ -499,20 +387,7 @@ void ReedShepps::path11(const Pose3d &p, bool timeflip, bool reflect) {
   path.emplace_back(PathElement(M_PI_2, Steering::LEFT, Gear::FORWARD));
   path.emplace_back(PathElement(v, Steering::RIGHT, Gear::BACKWARD));
 
-  if (timeflip) {
-    for (int i = 0; i < (int)path.size(); i++)
-      path[i].reverseGear();
-  }
-
-  if (reflect) {
-    for (int i = 0; i < (int)path.size(); i++)
-      path[i].reverseSteering();
-  }
-
-  if (dist < optimal_path_dist_) {
-    optimal_path_dist_ = dist;
-    optimal_path_ = path;
-  }
+  tryPath(dist, std::move(path), timeflip, reflect);
 }
 
 void ReedShepps::path12(const Pose3d &p, bool timeflip, bool reflect) {
@@ -539,20 +414,7 @@ void ReedShepps::path12(const Pose3d &p, bool timeflip, bool reflect) {
   path.emplace_back(PathElement(M_PI_2, Steering::LEFT, Gear::BACKWARD));
   path.emplace_back(PathElement(v, Steering::RIGHT, Gear::FORWARD));
 
-  if (timeflip) {
-    for (int i = 0; i < (int)path.size(); i++)
-      path[i].reverseGear();
-  }
-
-  if (reflect) {
-    for (int i = 0; i < (int)path.size(); i++)
-      path[i].reverseSteering();
-  }
-
-  if (dist < optimal_path_dist_) {
-    optimal_path_dist_ = dist;
-    optimal_path_ = path;
-  }
+  tryPath(dist, std::move(path), timeflip, reflect);
 }
 
 }; // namespace planner

@@ -52,8 +52,6 @@ private:
 
 private:
   State3d poseToState(const Pose3d &p);
-  State2d pose2dToState2d(const Pose2d &p);
-  Pose2d state2dToPose2d(const State2d &s);
 
   void preprocess();
   void simulate();

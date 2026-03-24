@@ -111,23 +111,16 @@ std::vector<Pose3d> Dubins::getOptimalPath() {
 
 void Dubins::tryPath(double dist, std::vector<PathElement> candidate,
                      bool reflect) {
-  if (!std::isfinite(dist))
+  if (!std::isfinite(dist) || dist >= optimal_path_dist_)
     return;
-
-  for (const auto &e : candidate) {
-    if (!std::isfinite(e.param))
-      return;
-  }
 
   if (reflect) {
     for (auto &e : candidate)
       e.reverseSteering();
   }
 
-  if (dist < optimal_path_dist_) {
-    optimal_path_dist_ = dist;
-    optimal_path_ = std::move(candidate);
-  }
+  optimal_path_dist_ = dist;
+  optimal_path_ = std::move(candidate);
 }
 
 void Dubins::computeParams(const Pose3d &p, double &alpha, double &beta,

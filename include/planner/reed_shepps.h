@@ -69,6 +69,8 @@ private:
   void path11(const Pose3d &p, bool timeflip, bool reflect);
   void path12(const Pose3d &p, bool timeflip, bool reflect);
 
+  void tryPath(double dist, std::vector<PathElement> candidate, bool timeflip, bool reflect);
+
 private:
   double min_turning_radius_;
   double angular_tolerance_, distance_tolerance_;

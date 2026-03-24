@@ -41,4 +41,12 @@ std::pair<double, double> GridMap::mapToWorld(double x, double y) {
   return {wx, wy};
 }
 
+State2d GridMap::pose2dToState2d(const Pose2d &p) {
+  return State2d(worldToMapDiscrete(p.x, p.y));
+}
+
+Pose2d GridMap::state2dToPose2d(const State2d &s) {
+  return Pose2d(mapToWorld(s.x, s.y));
+}
+
 }; // namespace planner

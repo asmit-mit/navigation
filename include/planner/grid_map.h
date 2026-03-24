@@ -1,6 +1,8 @@
 #pragma once
 
 #include "nav_msgs/msg/occupancy_grid.hpp"
+#include "planner/pose.h"
+#include "planner/state.h"
 
 namespace planner {
 
@@ -20,6 +22,9 @@ public:
   std::pair<int, int> worldToMapDiscrete(double x, double y);
   std::pair<double, double> worldToMapContinous(double x, double y);
   std::pair<double, double> mapToWorld(double x, double y);
+
+  State2d pose2dToState2d(const Pose2d &p);
+  Pose2d state2dToPose2d(const State2d &s);
 
 private:
   double resolution_;
