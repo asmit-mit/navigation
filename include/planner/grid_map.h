@@ -12,6 +12,8 @@ public:
 
   void setGrid(nav_msgs::msg::OccupancyGrid::SharedPtr grid);
 
+  int getDataAt(int x, int y);
+  int getDataAt(int idx);
   int getHeight();
   int getWidth();
   double getResolution();

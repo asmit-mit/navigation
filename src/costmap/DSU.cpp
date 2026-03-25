@@ -1,4 +1,4 @@
-#include "voronoi/DSU.h"
+#include "costmap/DSU.h"
 
 namespace voronoi {
 

@@ -74,19 +74,19 @@ private:
     if (!latest_map_ || !have_start_ || !have_goal_)
       return;
 
-    // start_pose_.pose.position.x = -1.58714;
-    // start_pose_.pose.position.y = 0.491547;
+    // start_pose_.pose.position.x = -0.444698;
+    // start_pose_.pose.position.y = -1.91125;
     // start_pose_.pose.orientation.x = 0;
     // start_pose_.pose.orientation.y = 0;
-    // start_pose_.pose.orientation.z = 0;
-    // start_pose_.pose.orientation.w = 1;
+    // start_pose_.pose.orientation.z = 0.0611258;
+    // start_pose_.pose.orientation.w = 0.99813;
     //
-    // goal_pose_.pose.position.x = -0.41513;
-    // goal_pose_.pose.position.y = -3.29784;
+    // goal_pose_.pose.position.x = -0.821665;
+    // goal_pose_.pose.position.y = 3.29122;
     // goal_pose_.pose.orientation.x = 0;
     // goal_pose_.pose.orientation.y = 0;
-    // goal_pose_.pose.orientation.z = 0.986706;
-    // goal_pose_.pose.orientation.w = 0.162517;
+    // goal_pose_.pose.orientation.z = 0.177572;
+    // goal_pose_.pose.orientation.w = 0.984108;
 
     double start_x = start_pose_.pose.position.x;
     double start_y = start_pose_.pose.position.y;

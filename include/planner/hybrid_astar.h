@@ -36,6 +36,8 @@ private:
 
     Node(const Pose3d &p, HybridAStar *planner);
     Node(const Pose3d &p, HybridAStar *planner, Node *parent);
+
+    int getStateIndex() const;
   };
 
   struct CompareNode {
@@ -69,6 +71,9 @@ private:
   double angular_resolution_, distance_resolution_;
   double angular_tolerance_, distance_tolerance_;
   double max_linear_velocity_, max_angular_velocity_;
+
+  double expand_step_;
+  double expand_ds_;
 
   Pose3d start_, end_;
 

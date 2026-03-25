@@ -12,6 +12,9 @@ void GridMap::setGrid(nav_msgs::msg::OccupancyGrid::SharedPtr grid) {
   resolution_ = grid->info.resolution;
 }
 
+int GridMap::getDataAt(int idx) { return grid_->data[idx]; }
+int GridMap::getDataAt(int x, int y) { return grid_->data[getIndex(x, y)]; }
+
 int GridMap::getHeight() { return height_; }
 int GridMap::getWidth() { return width_; }
 double GridMap::getResolution() { return resolution_; }
