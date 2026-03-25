@@ -1,7 +1,6 @@
 #pragma once
 
 #include <array>
-#include <cmath>
 #include <vector>
 
 #include "planner/motion_states.h"
@@ -18,7 +17,7 @@ public:
   void setMinTurningRadius(double min_radius);
   void simulate(const Pose3d &start, const Pose3d &end);
   double getOptimalDistance();
-  std::vector<Pose3d> getOptimalPath();
+  std::vector<Pose2d> getOptimalPath();
 
 private:
   struct PathElement {
@@ -69,14 +68,18 @@ private:
   void path11(const Pose3d &p, bool timeflip, bool reflect);
   void path12(const Pose3d &p, bool timeflip, bool reflect);
 
-  void tryPath(double dist, std::vector<PathElement> candidate, bool timeflip, bool reflect);
+  void tryPath(double dist, int count, bool timeflip, bool reflect);
 
 private:
   double min_turning_radius_;
   double angular_tolerance_, distance_tolerance_;
-  double optimal_path_dist_;
   double distance_resolution_;
-  std::vector<PathElement> optimal_path_;
+
+  double optimal_path_dist_;
+  int optimal_path_segment_count_;
+
+  std::array<PathElement, 5> optimal_path_;
+  std::array<PathElement, 5> candidate_path_;
 
   Pose3d start_, end_;
 

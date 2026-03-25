@@ -1,5 +1,6 @@
 #pragma once
 
+#include <array>
 #include <cmath>
 #include <vector>
 
@@ -17,7 +18,7 @@ public:
   void setMinTurningRadius(double min_radius);
   void simulate(const Pose3d &start, const Pose3d &end);
   double getOptimalDistance();
-  std::vector<Pose3d> getOptimalPath();
+  std::vector<Pose2d> getOptimalPath();
 
 private:
   struct PathElement {
@@ -44,16 +45,19 @@ private:
   void pathRLR(const Pose3d &p, bool reflect);
   void pathLRL(const Pose3d &p, bool reflect);
 
-  void tryPath(double dist, std::vector<PathElement> candidate, bool reflect);
+  void tryPath(double dist, int count, bool reflect);
   void computeParams(const Pose3d &p, double &alpha, double &beta, double &d);
 
 private:
   double min_turning_radius_;
   double angular_tolerance_, distance_tolerance_;
-  double optimal_path_dist_;
   double distance_resolution_;
 
-  std::vector<PathElement> optimal_path_;
+  double optimal_path_dist_;
+  int optimal_path_segment_count_;
+  std::array<PathElement, 3> optimal_path_;
+  std::array<PathElement, 3> candidate_path_;
+
   Pose3d start_, end_;
 };
 

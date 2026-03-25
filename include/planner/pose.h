@@ -16,6 +16,7 @@ struct Pose3d {
 struct Pose2d {
   double x, y;
 
+  Pose2d();
   Pose2d(const std::pair<double, double> &p);
   Pose2d(const Pose3d &p);
   Pose2d(double x, double y);

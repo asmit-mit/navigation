@@ -57,7 +57,7 @@ private:
   void simulate();
   double heuristic(const Node *node);
   bool goalReached(const Node *node);
-  std::vector<Pose3d> analyticalExpansion(const Node *node);
+  std::vector<Pose2d> analyticalExpansion(const Node *node);
   std::vector<std::pair<Pose3d, double>> expand(const Node *node);
 
   void freeNodes();

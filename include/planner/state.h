@@ -4,12 +4,12 @@
 namespace planner {
 
 struct State3d {
-  int grid_x;
-  int grid_y;
+  int x;
+  int y;
   int theta_bin;
 
   State3d();
-  State3d(int grid_x, int grid_y, int theta_bin);
+  State3d(int x, int y, int theta_bin);
   bool operator==(const State3d &other) const;
 };
 

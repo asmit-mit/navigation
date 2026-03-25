@@ -1,7 +1,9 @@
 #include "planner/dubins.h"
+#include "planner/motion_states.h"
 #include "utils/math_utils.h"
 
 #include <algorithm>
+#include <cassert>
 #include <limits>
 
 namespace planner {
@@ -11,7 +13,6 @@ Dubins::Dubins() {
   distance_resolution_ = 0.05;
   angular_tolerance_ = 0.1;
   distance_tolerance_ = 0.1;
-  optimal_path_dist_ = std::numeric_limits<double>::infinity();
 }
 
 void Dubins::setDistanceResolution(double resolution) {
@@ -28,17 +29,24 @@ void Dubins::setMinTurningRadius(double min_radius) {
 }
 
 void Dubins::simulate(const Pose3d &start, const Pose3d &end) {
+  assert(min_turning_radius_ > 0);
+  assert(distance_resolution_ > 0);
+
+  assert(std::isfinite(start.x) && std::isfinite(start.y) &&
+         std::isfinite(start.theta));
+  assert(std::isfinite(end.x) && std::isfinite(end.y) &&
+         std::isfinite(end.theta));
+
   start_ = start;
   end_ = end;
 
   if (utils::distance(start, end) < distance_tolerance_) {
-    optimal_path_.clear();
     optimal_path_dist_ = 0.0;
     return;
   }
 
   optimal_path_dist_ = std::numeric_limits<double>::infinity();
-  optimal_path_.clear();
+  optimal_path_segment_count_ = 0;
 
   Pose3d p = utils::changeOfBasis(start, end);
   p.x /= min_turning_radius_;
@@ -69,14 +77,15 @@ double Dubins::getOptimalDistance() {
   return optimal_path_dist_ * min_turning_radius_;
 }
 
-std::vector<Pose3d> Dubins::getOptimalPath() {
-  std::vector<Pose3d> poses;
+std::vector<Pose2d> Dubins::getOptimalPath() {
+  std::vector<Pose2d> poses;
   Pose3d curr = start_;
   poses.push_back(curr);
 
-  for (const auto &segment : optimal_path_) {
-    double curvature = 0.0;
+  for (int i = 0; i < optimal_path_segment_count_; i++) {
+    const auto &segment = optimal_path_[i];
 
+    double curvature = 0.0;
     if (segment.steering == Steering::LEFT)
       curvature = 1.0 / min_turning_radius_;
     else if (segment.steering == Steering::RIGHT)
@@ -109,18 +118,18 @@ std::vector<Pose3d> Dubins::getOptimalPath() {
   return poses;
 }
 
-void Dubins::tryPath(double dist, std::vector<PathElement> candidate,
-                     bool reflect) {
+void Dubins::tryPath(double dist, int count, bool reflect) {
   if (!std::isfinite(dist) || dist >= optimal_path_dist_)
     return;
 
-  if (reflect) {
-    for (auto &e : candidate)
-      e.reverseSteering();
+  for (int i = 0; i < count; i++) {
+    if (reflect)
+      candidate_path_[i].reverseSteering();
   }
 
   optimal_path_dist_ = dist;
-  optimal_path_ = std::move(candidate);
+  optimal_path_segment_count_ = count;
+  std::copy_n(candidate_path_.begin(), count, optimal_path_.begin());
 }
 
 void Dubins::computeParams(const Pose3d &p, double &alpha, double &beta,
@@ -157,10 +166,11 @@ void Dubins::pathLSL(const Pose3d &p, bool reflect) {
 
   double dist = t + u + v;
 
-  std::vector<PathElement> path = {
-      {t, Steering::LEFT}, {u, Steering::STRAIGHT}, {v, Steering::LEFT}};
+  candidate_path_[0] = PathElement(t, Steering::LEFT);
+  candidate_path_[1] = PathElement(u, Steering::STRAIGHT);
+  candidate_path_[2] = PathElement(v, Steering::LEFT);
 
-  tryPath(dist, std::move(path), reflect);
+  tryPath(dist, 3, reflect);
 }
 
 void Dubins::pathRSR(const Pose3d &p, bool reflect) {
@@ -185,10 +195,11 @@ void Dubins::pathRSR(const Pose3d &p, bool reflect) {
 
   double dist = t + u + v;
 
-  std::vector<PathElement> path = {
-      {t, Steering::RIGHT}, {u, Steering::STRAIGHT}, {v, Steering::RIGHT}};
+  candidate_path_[0] = PathElement(t, Steering::RIGHT);
+  candidate_path_[1] = PathElement(u, Steering::STRAIGHT);
+  candidate_path_[2] = PathElement(v, Steering::RIGHT);
 
-  tryPath(dist, std::move(path), reflect);
+  tryPath(dist, 3, reflect);
 }
 
 void Dubins::pathLSR(const Pose3d &p, bool reflect) {
@@ -212,10 +223,11 @@ void Dubins::pathLSR(const Pose3d &p, bool reflect) {
 
   double dist = t + u + v;
 
-  std::vector<PathElement> path = {
-      {t, Steering::LEFT}, {u, Steering::STRAIGHT}, {v, Steering::RIGHT}};
+  candidate_path_[0] = PathElement(t, Steering::LEFT);
+  candidate_path_[1] = PathElement(u, Steering::STRAIGHT);
+  candidate_path_[2] = PathElement(v, Steering::RIGHT);
 
-  tryPath(dist, std::move(path), reflect);
+  tryPath(dist, 3, reflect);
 }
 
 void Dubins::pathRSL(const Pose3d &p, bool reflect) {
@@ -239,10 +251,11 @@ void Dubins::pathRSL(const Pose3d &p, bool reflect) {
 
   double dist = t + u + v;
 
-  std::vector<PathElement> path = {
-      {t, Steering::RIGHT}, {u, Steering::STRAIGHT}, {v, Steering::LEFT}};
+  candidate_path_[0] = PathElement(t, Steering::RIGHT);
+  candidate_path_[1] = PathElement(u, Steering::STRAIGHT);
+  candidate_path_[2] = PathElement(v, Steering::LEFT);
 
-  tryPath(dist, std::move(path), reflect);
+  tryPath(dist, 3, reflect);
 }
 
 void Dubins::pathRLR(const Pose3d &p, bool reflect) {
@@ -268,10 +281,11 @@ void Dubins::pathRLR(const Pose3d &p, bool reflect) {
 
   double dist = t + u + v;
 
-  std::vector<PathElement> path = {
-      {t, Steering::RIGHT}, {u, Steering::LEFT}, {v, Steering::RIGHT}};
+  candidate_path_[0] = PathElement(t, Steering::RIGHT);
+  candidate_path_[1] = PathElement(u, Steering::LEFT);
+  candidate_path_[2] = PathElement(v, Steering::RIGHT);
 
-  tryPath(dist, std::move(path), reflect);
+  tryPath(dist, 3, reflect);
 }
 
 void Dubins::pathLRL(const Pose3d &p, bool reflect) {
@@ -297,10 +311,11 @@ void Dubins::pathLRL(const Pose3d &p, bool reflect) {
 
   double dist = t + u + v;
 
-  std::vector<PathElement> path = {
-      {t, Steering::LEFT}, {u, Steering::RIGHT}, {v, Steering::LEFT}};
+  candidate_path_[0] = PathElement(t, Steering::LEFT);
+  candidate_path_[1] = PathElement(u, Steering::RIGHT);
+  candidate_path_[2] = PathElement(v, Steering::LEFT);
 
-  tryPath(dist, std::move(path), reflect);
+  tryPath(dist, 3, reflect);
 }
 
 } // namespace planner

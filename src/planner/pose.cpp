@@ -3,6 +3,11 @@
 
 namespace planner {
 
+Pose2d::Pose2d() {
+  x = 0;
+  y = 0;
+}
+
 Pose2d::Pose2d(const std::pair<double, double> &p) {
   x = p.first;
   y = p.second;

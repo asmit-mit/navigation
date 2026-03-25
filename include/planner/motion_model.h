@@ -20,7 +20,7 @@ public:
   void setMinTurningRadius(double min_radius);
   void simulate(const Pose3d &start, const Pose3d &end);
   double getOptimalDistance();
-  std::vector<Pose3d> getOptimalPath();
+  std::vector<Pose2d> getOptimalPath();
 
 private:
   MotionModelType type_;

@@ -204,7 +204,7 @@ void HybridAStar::simulate() {
       continue;
     closed.insert(curr);
 
-    std::vector<Pose3d> analytical_expansion = analyticalExpansion(curr);
+    std::vector<Pose2d> analytical_expansion = analyticalExpansion(curr);
     if (!analytical_expansion.empty()) {
       while (curr) {
         plan_.push_back(curr->pose);
@@ -220,7 +220,7 @@ void HybridAStar::simulate() {
 
     for (auto [nbr, cost] : neighbors) {
       State3d next_state = poseToState(nbr);
-      if (!grid_.isValid(next_state.grid_x, next_state.grid_y))
+      if (!grid_.isValid(next_state.x, next_state.y))
         continue;
 
       Node *next = new Node(nbr, this);
@@ -240,57 +240,51 @@ void HybridAStar::simulate() {
   return;
 }
 
-std::vector<Pose3d> HybridAStar::analyticalExpansion(const Node *node) {
+std::vector<Pose2d> HybridAStar::analyticalExpansion(const Node *node) {
   motion_model_.simulate(node->pose, end_);
-  std::vector<Pose3d> rs_path = motion_model_.getOptimalPath();
+  std::vector<Pose2d> mm_path = motion_model_.getOptimalPath();
 
-  if (rs_path.empty())
+  if (mm_path.empty())
     return {};
 
-  for (size_t i = 1; i < rs_path.size(); ++i) {
-    const Pose3d &p0 = rs_path[i - 1];
-    const Pose3d &p1 = rs_path[i];
+  for (size_t i = 1; i < mm_path.size(); ++i) {
+    const Pose2d &p0 = mm_path[i - 1];
+    const Pose2d &p1 = mm_path[i];
+
+    Pose2d d = p1 - p0;
 
     if (i == 1) {
-      auto [gx0, gy0] = grid_.worldToMapDiscrete(p0.x, p0.y);
-      if (!grid_.isValid(gx0, gy0))
+      State2d s0 = grid_.pose2dToState2d(p0);
+      if (!grid_.isValid(s0.x, s0.y))
         return {};
     }
 
     for (int j = 1; j <= num_samples_; ++j) {
       double t = static_cast<double>(j) / (num_samples_ + 1);
+      Pose2d interp = p0 + d * t;
+      State2d s_interp = grid_.pose2dToState2d(interp);
 
-      Pose3d interp;
-      interp.x = p0.x + t * (p1.x - p0.x);
-      interp.y = p0.y + t * (p1.y - p0.y);
-
-      double dtheta = std::atan2(std::sin(p1.theta - p0.theta),
-                                 std::cos(p1.theta - p0.theta));
-      interp.theta = p0.theta + t * dtheta;
-      interp.theta = std::atan2(std::sin(interp.theta), std::cos(interp.theta));
-
-      auto [gx, gy] = grid_.worldToMapDiscrete(interp.x, interp.y);
-
-      if (!grid_.isValid(gx, gy))
+      if (!grid_.isValid(s_interp.x, s_interp.y))
         return {};
     }
 
-    auto [gx1, gy1] = grid_.worldToMapDiscrete(p1.x, p1.y);
-    if (!grid_.isValid(gx1, gy1))
+    State2d s1 = grid_.pose2dToState2d(p1);
+    if (!grid_.isValid(s1.x, s1.y))
       return {};
   }
 
-  return rs_path;
+  return mm_path;
 }
+
 double HybridAStar::heuristic(const Node *node) {
   motion_model_.simulate(node->pose, end_);
 
-  double h_rs = motion_model_.getOptimalDistance();
+  double h_mm = motion_model_.getOptimalDistance();
   double h_2d = utils::distance(node->pose, end_);
 
-  double h1 = std::max(h_rs, h_2d);
-  double h2 = holonomic_with_obstacle_cost_[grid_.getIndex(node->state.grid_x,
-                                                           node->state.grid_y)];
+  double h1 = std::max(h_mm, h_2d);
+  double h2 = holonomic_with_obstacle_cost_[grid_.getIndex(node->state.x,
+                                                           node->state.y)];
   return std::max(h1, h2);
 }
 
