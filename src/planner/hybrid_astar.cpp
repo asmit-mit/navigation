@@ -56,7 +56,7 @@ HybridAStar::HybridAStar() {
   distance_tolerance_ = 0.5;
 
   map_resolution_ = 0.05;
-  expand_step_ = std::min(map_resolution_, distance_resolution_);
+  expand_step_ = std::min(1.41421356 * map_resolution_, distance_resolution_);
   expand_ds_ = expand_step_ / num_samples_;
 
   motion_model_.setMotionModel(MotionModelType::DUBINS);
@@ -70,11 +70,12 @@ void HybridAStar::setMotionModel(MotionModelType type) {
 
 void HybridAStar::setGrid(nav_msgs::msg::OccupancyGrid::SharedPtr grid) {
   grid_.setGrid(grid);
+
   height_ = grid_.getHeight();
   width_ = grid_.getWidth();
   map_resolution_ = grid_.getResolution();
 
-  expand_step_ = std::min(map_resolution_, distance_resolution_);
+  expand_step_ = std::min(1.41421356 * map_resolution_, distance_resolution_);
   expand_ds_ = expand_step_ / num_samples_;
 }
 
@@ -99,12 +100,12 @@ void HybridAStar::setVelocities(double linear, double angular) {
 
   motion_model_.setMinTurningRadius(linear / angular);
 
-  controls_ = {{max_linear_velocity_, 0.0},
-               {max_linear_velocity_, max_angular_velocity_},
-               {max_linear_velocity_, -max_angular_velocity_},
-               {-max_linear_velocity_, 0.0},
-               {-max_linear_velocity_, max_angular_velocity_},
-               {-max_linear_velocity_, -max_angular_velocity_}};
+  controls_[0] = {max_linear_velocity_, 0.0};
+  controls_[1] = {max_linear_velocity_, max_angular_velocity_};
+  controls_[2] = {max_linear_velocity_, -max_angular_velocity_};
+  controls_[3] = {-max_linear_velocity_, 0.0};
+  controls_[4] = {-max_linear_velocity_, max_angular_velocity_};
+  controls_[5] = {-max_linear_velocity_, -max_angular_velocity_};
 }
 
 void HybridAStar::setGoal(double x, double y, double theta) {
@@ -235,7 +236,7 @@ void HybridAStar::simulate() {
 
     std::vector<std::pair<Pose3d, double>> neighbors = expand(curr);
 
-    for (auto &[nbr_pose, cost] : neighbors) {
+    for (auto &[nbr_pose, move_penalty] : neighbors) {
       State3d next_state = poseToState(nbr_pose);
 
       if (!grid_.isValid(next_state.x, next_state.y))
@@ -247,8 +248,10 @@ void HybridAStar::simulate() {
       if (closed[next_state_idx])
         continue;
 
+      int costmap_cost = grid_.getDataAt(next_state.x, next_state.y);
+
       Node *next = new Node(nbr_pose, this, curr);
-      next->g_cost = curr->g_cost + cost;
+      next->g_cost = curr->g_cost + move_penalty + costmap_cost;
       next->h_cost = heuristic(next);
       open.push(next);
       nodes_.push_back(next);

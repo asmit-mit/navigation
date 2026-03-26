@@ -1,6 +1,8 @@
+#include <array>
 #include <nav_msgs/msg/detail/occupancy_grid__struct.hpp>
 #include <vector>
 
+#include "costmap/costmap.h"
 #include "planner/grid_map.h"
 #include "planner/motion_model.h"
 #include "planner/optimizer.h"
@@ -94,7 +96,7 @@ private:
   std::vector<Pose2d> plan_;
 
   std::vector<Node *> nodes_;
-  std::vector<std::pair<double, double>> controls_;
+  std::array<std::pair<double, double>, 6> controls_;
 
   friend class Node;
 };

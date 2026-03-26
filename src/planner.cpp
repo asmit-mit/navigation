@@ -1,7 +1,7 @@
 #include <chrono>
 #include <functional>
+#include <iostream>
 #include <memory>
-#include <nav_msgs/msg/detail/occupancy_grid__struct.hpp>
 #include <vector>
 
 #include "geometry_msgs/msg/pose_stamped.hpp"
@@ -12,14 +12,18 @@
 #include "tf2/LinearMath/Matrix3x3.hpp"
 #include "tf2_geometry_msgs/tf2_geometry_msgs.hpp"
 
+#include "costmap/costmap.h"
 #include "planner/hybrid_astar.h"
 
 using namespace std::placeholders;
 using namespace std::chrono_literals;
+using std::cout;
+using std::endl;
 
 class Planner : public rclcpp::Node {
 public:
   Planner() : Node("planner") {
+    // costmap_msg_ = std::make_shared<nav_msgs::msg::OccupancyGrid>();
 
     rclcpp::QoS map_qos(rclcpp::KeepLast(1));
     map_qos.transient_local();
@@ -34,9 +38,8 @@ public:
     path_pub_ =
         this->create_publisher<nav_msgs::msg::Path>("/hybrid_astar_path", 10);
 
-    // map_pub_ =
-    //     this->create_publisher<nav_msgs::msg::OccupancyGrid>("/hybrid_astar_map",
-    //     10);
+    map_pub_ =
+        this->create_publisher<nav_msgs::msg::OccupancyGrid>("/costmap", 10);
 
     timer_ = this->create_wall_timer(500ms,
                                      std::bind(&Planner::timerCallback, this));
@@ -47,6 +50,27 @@ public:
 private:
   void mapCallback(const nav_msgs::msg::OccupancyGrid::SharedPtr msg) {
     latest_map_ = msg;
+
+    // costmap.setScalingFactor(20.0);
+    // costmap.setRadius(0.1);
+    // costmap.setGrid(msg);
+    // auto costmap_data = costmap.getCostmap();
+    //
+    // costmap_msg_->header = msg->header;
+    // costmap_msg_->info = msg->info;
+    // costmap_msg_->data.resize(costmap_data.size());
+    //
+    // for (size_t i = 0; i < costmap_data.size(); i++) {
+    //   if (msg->data[i] == 100) {
+    //     costmap_msg_->data[i] = 100;
+    //   } else {
+    //     uint8_t c = costmap_data[i];
+    //     costmap_msg_->data[i] = static_cast<int8_t>(std::min(100.0, c
+    //     / 2.55));
+    //   }
+    // }
+    //
+    // map_pub_->publish(*costmap_msg_);
   }
 
   void goalCallback(const geometry_msgs::msg::PoseStamped::SharedPtr msg) {
@@ -112,7 +136,6 @@ private:
     planner.setStart(start_x, start_y, start_theta);
     planner.setGoal(goal_x, goal_y, goal_theta);
     planner.setResolutions(0.1, 5);
-    planner.setIterations(1000);
 
     auto start = std::chrono::steady_clock::now();
 
@@ -162,13 +185,15 @@ private:
   rclcpp::Subscription<geometry_msgs::msg::PoseStamped>::SharedPtr goal_sub_;
 
   rclcpp::Publisher<nav_msgs::msg::Path>::SharedPtr path_pub_;
-  // rclcpp::Publisher<nav_msgs::msg::OccupancyGrid>::SharedPtr map_pub_;
+  rclcpp::Publisher<nav_msgs::msg::OccupancyGrid>::SharedPtr map_pub_;
 
   nav_msgs::msg::OccupancyGrid::SharedPtr latest_map_;
+  // nav_msgs::msg::OccupancyGrid::SharedPtr costmap_msg_;
 
   geometry_msgs::msg::PoseStamped start_pose_;
   geometry_msgs::msg::PoseStamped goal_pose_;
 
+  // costmap::Costmap costmap;
   planner::HybridAStar planner;
 
   bool have_start_ = false;

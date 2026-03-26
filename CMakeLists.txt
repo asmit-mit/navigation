@@ -18,8 +18,8 @@ find_package(tf2_geometry_msgs REQUIRED)
 
 add_executable(planner 
   src/planner.cpp 
-  src/costmap/EDT.cpp 
   src/costmap/DSU.cpp 
+  src/costmap/costmap.cpp 
 
   src/planner/pose.cpp
   src/planner/state.cpp
