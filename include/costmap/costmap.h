@@ -11,22 +11,20 @@ class Costmap {
 public:
   Costmap() {}
 
-  void setGrid(nav_msgs::msg::OccupancyGrid::SharedPtr grid);
+  void setGrid(const planner::GridMap *grid);
   void setRadius(double radius);
   void setScalingFactor(double scaling_factor);
   void computeCostmap();
 
-  double getDataAt(int x, int y);
-  double getDataAt(int idx);
+  double getDataAt(int x, int y) const;
+  double getDataAt(int idx) const;
 
 private:
   void computeDT1D(int start, int size, int stride);
 
 private:
+  const planner::GridMap *grid_;
   double radius_, scaling_factor_;
-  int height_, width_;
-  double resolution_;
-  planner::GridMap grid_;
 
   static constexpr double INF = std::numeric_limits<double>::infinity();
 

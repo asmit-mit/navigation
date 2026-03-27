@@ -23,7 +23,7 @@ using std::endl;
 class Planner : public rclcpp::Node {
 public:
   Planner() : Node("planner") {
-    // costmap_msg_ = std::make_shared<nav_msgs::msg::OccupancyGrid>();
+    costmap_msg_ = nav_msgs::msg::OccupancyGrid();
 
     rclcpp::QoS map_qos(rclcpp::KeepLast(1));
     map_qos.transient_local();
@@ -51,26 +51,28 @@ private:
   void mapCallback(const nav_msgs::msg::OccupancyGrid::SharedPtr msg) {
     latest_map_ = msg;
 
-    // costmap.setScalingFactor(20.0);
-    // costmap.setRadius(0.1);
-    // costmap.setGrid(msg);
-    // auto costmap_data = costmap.getCostmap();
-    //
-    // costmap_msg_->header = msg->header;
-    // costmap_msg_->info = msg->info;
-    // costmap_msg_->data.resize(costmap_data.size());
-    //
-    // for (size_t i = 0; i < costmap_data.size(); i++) {
-    //   if (msg->data[i] == 100) {
-    //     costmap_msg_->data[i] = 100;
-    //   } else {
-    //     uint8_t c = costmap_data[i];
-    //     costmap_msg_->data[i] = static_cast<int8_t>(std::min(100.0, c
-    //     / 2.55));
-    //   }
-    // }
-    //
-    // map_pub_->publish(*costmap_msg_);
+    grid_map.setGrid(msg);
+    int size = grid_map.getHeight() * grid_map.getWidth();
+
+    costmap.setGrid(&grid_map);
+    costmap.setScalingFactor(20.0);
+    costmap.setRadius(0.1);
+    costmap.computeCostmap();
+
+    costmap_msg_.header = msg->header;
+    costmap_msg_.info = msg->info;
+    costmap_msg_.data.resize(size);
+
+    for (int i = 0; i < size; i++) {
+      if (msg->data[i] == 100) {
+        costmap_msg_.data[i] = 100;
+      } else {
+        double c = costmap.getDataAt(i);
+        costmap_msg_.data[i] = static_cast<int8_t>(std::min(100.0, c / 2.55));
+      }
+    }
+
+    map_pub_->publish(costmap_msg_);
   }
 
   void goalCallback(const geometry_msgs::msg::PoseStamped::SharedPtr msg) {
@@ -95,8 +97,9 @@ private:
   }
 
   void timerCallback() {
-    if (!latest_map_ || !have_start_ || !have_goal_)
-      return;
+    return;
+    // if (!latest_map_ || !have_start_ || !have_goal_)
+    //   return;
 
     // start_pose_.pose.position.x = -0.444698;
     // start_pose_.pose.position.y = -1.91125;
@@ -130,7 +133,7 @@ private:
 
     RCLCPP_INFO(this->get_logger(), "Start: %f %f", start_x, start_y);
     RCLCPP_INFO(this->get_logger(), "Goal: %f %f", goal_x, goal_y);
-    planner.setGrid(latest_map_);
+    planner.setGrid(&grid_map);
     planner.setVelocities(0.5, 2);
     planner.setTolerance(0.5, 0.2);
     planner.setStart(start_x, start_y, start_theta);
@@ -188,12 +191,13 @@ private:
   rclcpp::Publisher<nav_msgs::msg::OccupancyGrid>::SharedPtr map_pub_;
 
   nav_msgs::msg::OccupancyGrid::SharedPtr latest_map_;
-  // nav_msgs::msg::OccupancyGrid::SharedPtr costmap_msg_;
+  nav_msgs::msg::OccupancyGrid costmap_msg_;
 
   geometry_msgs::msg::PoseStamped start_pose_;
   geometry_msgs::msg::PoseStamped goal_pose_;
 
-  // costmap::Costmap costmap;
+  planner::GridMap grid_map;
+  costmap::Costmap costmap;
   planner::HybridAStar planner;
 
   bool have_start_ = false;

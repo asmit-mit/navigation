@@ -1,8 +1,6 @@
 #pragma once
 
 #include "nav_msgs/msg/occupancy_grid.hpp"
-#include "planner/pose.h"
-#include "planner/state.h"
 
 namespace planner {
 
@@ -12,21 +10,18 @@ public:
 
   void setGrid(nav_msgs::msg::OccupancyGrid::SharedPtr grid);
 
-  int getDataAt(int x, int y);
-  int getDataAt(int idx);
-  int getHeight();
-  int getWidth();
-  double getResolution();
+  int getDataAt(int x, int y) const;
+  int getDataAt(int idx) const;
+  int getHeight() const;
+  int getWidth() const;
+  double getResolution() const;
 
-  bool isValid(int x, int y);
-  int getIndex(int x, int y);
+  bool isValid(int x, int y) const;
+  int getIndex(int x, int y) const;
 
-  std::pair<int, int> worldToMapDiscrete(double x, double y);
-  std::pair<double, double> worldToMapContinous(double x, double y);
-  std::pair<double, double> mapToWorld(double x, double y);
-
-  State2d pose2dToState2d(const Pose2d &p);
-  Pose2d state2dToPose2d(const State2d &s);
+  std::pair<int, int> worldToMapDiscrete(double x, double y) const;
+  std::pair<double, double> worldToMapContinous(double x, double y) const;
+  std::pair<double, double> mapToWorld(double x, double y) const;
 
 private:
   double resolution_;

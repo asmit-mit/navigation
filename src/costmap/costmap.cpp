@@ -1,4 +1,5 @@
 #include "costmap/costmap.h"
+#include "planner/grid_map.h"
 
 #include <cmath>
 #include <limits>
@@ -6,16 +7,14 @@
 
 namespace costmap {
 
-void Costmap::setGrid(nav_msgs::msg::OccupancyGrid::SharedPtr grid) {
-  grid_.setGrid(grid);
-  height_ = grid_.getHeight();
-  width_ = grid_.getWidth();
-  resolution_ = grid_.getResolution();
+void Costmap::setGrid(const planner::GridMap *grid) {
+  grid_ = grid;
 
-  costmap_.resize(height_ * width_);
+  int size = grid_->getHeight() * grid_->getWidth();
+  costmap_.resize(size);
 
-  for (int i = 0; i < width_ * height_; i++) {
-    if (grid_.getDataAt(i) == 100) {
+  for (int i = 0; i < size; i++) {
+    if (grid_->getDataAt(i) == 100) {
       costmap_[i] = 0;
     } else {
       costmap_[i] = INF;
@@ -30,23 +29,27 @@ void Costmap::setScalingFactor(double scaling_factor) {
 }
 
 void Costmap::computeCostmap() {
-  for (int y = 0; y < height_; y++) {
-    computeDT1D(y * width_, width_, 1);
-  }
+  int height = grid_->getHeight();
+  int width = grid_->getWidth();
+  double resolution = grid_->getResolution();
 
-  for (int x = 0; x < width_; x++) {
-    computeDT1D(x, height_, width_);
-  }
+  for (int y = 0; y < height; y++)
+    computeDT1D(y * width, width, 1);
 
-  for (int i = 0; i < height_ * width_; i++) {
-    double dist = costmap_[i];
-    dist *= resolution_;
+  for (int x = 0; x < width; x++)
+    computeDT1D(x, height, width);
 
-    if (dist == 0.0) {
+  for (int i = 0; i < height * width; i++) {
+    double sq_dist = costmap_[i];
+
+    if (sq_dist < 1e-12) {
       costmap_[i] = 254;
-    } else if (dist <= radius_) {
+    } else if (sq_dist <= radius_ * radius_) {
       costmap_[i] = 253;
     } else {
+      double dist = std::sqrt(sq_dist);
+      dist *= resolution;
+
       double cost = 252.0 * std::exp(-scaling_factor_ * (dist - radius_));
       cost = std::max(0.0, std::min(252.0, cost));
       costmap_[i] = cost;
@@ -54,10 +57,10 @@ void Costmap::computeCostmap() {
   }
 }
 
-double Costmap::getDataAt(int idx) { return costmap_[idx]; }
+double Costmap::getDataAt(int idx) const { return costmap_[idx]; }
 
-double Costmap::getDataAt(int x, int y) {
-  return costmap_[grid_.getIndex(x, y)];
+double Costmap::getDataAt(int x, int y) const {
+  return costmap_[grid_->getIndex(x, y)];
 }
 
 void Costmap::computeDT1D(int start, int size, int stride) {

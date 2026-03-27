@@ -2,7 +2,6 @@
 #include <nav_msgs/msg/detail/occupancy_grid__struct.hpp>
 #include <vector>
 
-#include "costmap/costmap.h"
 #include "planner/grid_map.h"
 #include "planner/motion_model.h"
 #include "planner/optimizer.h"
@@ -16,7 +15,7 @@ public:
   HybridAStar();
 
   void setMotionModel(MotionModelType type);
-  void setGrid(nav_msgs::msg::OccupancyGrid::SharedPtr grid);
+  void setGrid(const GridMap *grid);
   void setTolerance(double angle, double distance);
   void setResolutions(double distance, double angle);
   void setVelocities(double linear, double angluar);
@@ -56,6 +55,8 @@ private:
 
 private:
   State3d poseToState(const Pose3d &p);
+  State2d pose2dToState2d(const Pose2d &p);
+  Pose2d state2dToPose2d(const State2d &s);
 
   void preprocess();
   void simulate();
@@ -88,8 +89,8 @@ private:
   static constexpr double penalty_change_steering_ = 1.5;
   static constexpr double penalty_reverse_ = 3.0;
 
+  const GridMap *grid_;
   MotionModel motion_model_;
-  GridMap grid_;
   Optimizer optimizer_;
 
   std::vector<double> holonomic_with_obstacle_cost_;
