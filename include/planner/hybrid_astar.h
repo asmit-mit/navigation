@@ -1,8 +1,7 @@
 #include <array>
-#include <nav_msgs/msg/detail/occupancy_grid__struct.hpp>
 #include <vector>
 
-#include "planner/grid_map.h"
+#include "costmap/costmap.h"
 #include "planner/motion_model.h"
 #include "planner/optimizer.h"
 #include "planner/pose.h"
@@ -15,7 +14,7 @@ public:
   HybridAStar();
 
   void setMotionModel(MotionModelType type);
-  void setGrid(const GridMap *grid);
+  void setCostmap(const costmap::Costmap *costmap);
   void setTolerance(double angle, double distance);
   void setResolutions(double distance, double angle);
   void setVelocities(double linear, double angluar);
@@ -85,11 +84,15 @@ private:
   static constexpr int dx_[8] = {-1, 1, -1, 0, 1, -1, 0, 1};
   static constexpr int dy_[8] = {0, 0, 1, 1, 1, -1, -1, -1};
 
-  static constexpr double penalty_steering_ = 1.05;
-  static constexpr double penalty_change_steering_ = 1.5;
-  static constexpr double penalty_reverse_ = 3.0;
+  static constexpr double steering_penalty_ = 1.7;
+  static constexpr double change_steering_penalty_ = 0.1;
+  static constexpr double reverse_penalty_ = 2.0;
+  static constexpr double cost_penalty_ = 15.0;
+  static constexpr double expansion_cost_ = 200.0;
+  static constexpr double path_length_weight_ = 0.985;
+  static constexpr double epsilon_ = 1e-6;
 
-  const GridMap *grid_;
+  const costmap::Costmap *costmap_;
   MotionModel motion_model_;
   Optimizer optimizer_;
 

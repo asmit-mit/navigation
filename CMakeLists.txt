@@ -18,8 +18,10 @@ find_package(tf2_geometry_msgs REQUIRED)
 
 add_executable(planner 
   src/planner.cpp 
+
   src/costmap/DSU.cpp 
   src/costmap/costmap.cpp 
+  src/costmap/grid_map.cpp
 
   src/planner/pose.cpp
   src/planner/state.cpp
@@ -27,7 +29,6 @@ add_executable(planner
   src/planner/reed_shepps.cpp
   src/planner/dubins.cpp
   src/planner/motion_model.cpp
-  src/planner/grid_map.cpp
   src/planner/optimizer.cpp
 
   src/utils/math_utils.cpp)

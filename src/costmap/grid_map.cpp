@@ -1,9 +1,14 @@
-#include "planner/grid_map.h"
+#include "costmap/grid_map.h"
+
 #include <cmath>
 
-namespace planner {
+namespace costmap {
 
-GridMap::GridMap() {}
+GridMap::GridMap() {
+  resolution_ = 0.1;
+  height_ = 100;
+  width_ = 100;
+}
 
 void GridMap::setGrid(nav_msgs::msg::OccupancyGrid::SharedPtr grid) {
   grid_ = grid;

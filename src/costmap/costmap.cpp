@@ -1,5 +1,4 @@
 #include "costmap/costmap.h"
-#include "planner/grid_map.h"
 
 #include <cmath>
 #include <limits>
@@ -7,14 +6,18 @@
 
 namespace costmap {
 
-void Costmap::setGrid(const planner::GridMap *grid) {
+void Costmap::setGrid(nav_msgs::msg::OccupancyGrid::SharedPtr grid) {
   grid_ = grid;
+  height_ = grid->info.height;
+  width_ = grid->info.width;
+  resolution_ = grid->info.resolution;
 
-  int size = grid_->getHeight() * grid_->getWidth();
+  int size = height_ * width_;
+  costmap_.resize(size);
   costmap_.resize(size);
 
   for (int i = 0; i < size; i++) {
-    if (grid_->getDataAt(i) == 100) {
+    if (getDataAt(i) == 100) {
       costmap_[i] = 0;
     } else {
       costmap_[i] = INF;
@@ -28,39 +31,40 @@ void Costmap::setScalingFactor(double scaling_factor) {
   scaling_factor_ = scaling_factor;
 }
 
+void Costmap::setAllowUnknown(bool allow_unknown) {
+  allow_unknown_ = allow_unknown;
+}
+
 void Costmap::computeCostmap() {
-  int height = grid_->getHeight();
-  int width = grid_->getWidth();
-  double resolution = grid_->getResolution();
+  for (int y = 0; y < height_; y++)
+    computeDT1D(y * width_, width_, 1);
 
-  for (int y = 0; y < height; y++)
-    computeDT1D(y * width, width, 1);
+  for (int x = 0; x < width_; x++)
+    computeDT1D(x, height_, width_);
 
-  for (int x = 0; x < width; x++)
-    computeDT1D(x, height, width);
+  for (int i = 0; i < height_ * width_; i++) {
+    double sq_dist_cells = costmap_[i];
+    double dist = std::sqrt(sq_dist_cells) * resolution_;
 
-  for (int i = 0; i < height * width; i++) {
-    double sq_dist = costmap_[i];
-
-    if (sq_dist < 1e-12) {
-      costmap_[i] = 254;
-    } else if (sq_dist <= radius_ * radius_) {
-      costmap_[i] = 253;
+    double raw_cost;
+    if (dist < 1e-6) {
+      raw_cost = 254.0;
+    } else if (dist <= radius_) {
+      raw_cost = 253.0;
     } else {
-      double dist = std::sqrt(sq_dist);
-      dist *= resolution;
+      raw_cost = 252.0 * std::exp(-scaling_factor_ * (dist - radius_));
 
-      double cost = 252.0 * std::exp(-scaling_factor_ * (dist - radius_));
-      cost = std::max(0.0, std::min(252.0, cost));
-      costmap_[i] = cost;
+      raw_cost = std::clamp(raw_cost, 0.0, 252.0);
     }
+
+    costmap_[i] = raw_cost;
   }
 }
 
-double Costmap::getDataAt(int idx) const { return costmap_[idx]; }
+double Costmap::getCostAt(int idx) const { return costmap_[idx]; }
 
-double Costmap::getDataAt(int x, int y) const {
-  return costmap_[grid_->getIndex(x, y)];
+double Costmap::getCostAt(int x, int y) const {
+  return costmap_[getIndex(x, y)];
 }
 
 void Costmap::computeDT1D(int start, int size, int stride) {

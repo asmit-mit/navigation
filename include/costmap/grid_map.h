@@ -2,13 +2,14 @@
 
 #include "nav_msgs/msg/occupancy_grid.hpp"
 
-namespace planner {
+namespace costmap {
 
 class GridMap {
 public:
   GridMap();
+  virtual ~GridMap() = default;
 
-  void setGrid(nav_msgs::msg::OccupancyGrid::SharedPtr grid);
+  virtual void setGrid(nav_msgs::msg::OccupancyGrid::SharedPtr grid);
 
   int getDataAt(int x, int y) const;
   int getDataAt(int idx) const;
@@ -23,7 +24,7 @@ public:
   std::pair<double, double> worldToMapContinous(double x, double y) const;
   std::pair<double, double> mapToWorld(double x, double y) const;
 
-private:
+protected:
   double resolution_;
   int height_, width_;
 

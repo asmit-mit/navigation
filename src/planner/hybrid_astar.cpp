@@ -1,12 +1,13 @@
 #include "planner/hybrid_astar.h"
+#include "costmap/costmap.h"
 #include "planner/motion_model.h"
 #include "utils/math_utils.h"
 
 #include <cmath>
-#include <iostream>
 #include <limits>
 #include <queue>
 
+#include <iostream>
 using std::cout;
 
 namespace planner {
@@ -59,7 +60,7 @@ HybridAStar::HybridAStar() {
   expand_step_ = std::min(1.41421356 * map_resolution_, distance_resolution_);
   expand_ds_ = expand_step_ / num_samples_;
 
-  motion_model_.setMotionModel(MotionModelType::DUBINS);
+  motion_model_.setMotionModel(MotionModelType::REED_SHEPPS);
   motion_model_.setDistanceResolution(distance_resolution_);
   motion_model_.setMinTurningRadius(1);
 }
@@ -68,12 +69,12 @@ void HybridAStar::setMotionModel(MotionModelType type) {
   motion_model_.setMotionModel(type);
 }
 
-void HybridAStar::setGrid(const GridMap *grid) {
-  grid_ = grid;
+void HybridAStar::setCostmap(const costmap::Costmap *costmap) {
+  costmap_ = costmap;
 
-  height_ = grid_->getHeight();
-  width_ = grid_->getWidth();
-  map_resolution_ = grid_->getResolution();
+  height_ = costmap_->getHeight();
+  width_ = costmap_->getWidth();
+  map_resolution_ = costmap_->getResolution();
 
   expand_step_ = std::min(1.41421356 * map_resolution_, distance_resolution_);
   expand_ds_ = expand_step_ / num_samples_;
@@ -109,8 +110,15 @@ void HybridAStar::setVelocities(double linear, double angular) {
 }
 
 void HybridAStar::setGoal(double x, double y, double theta) {
-  end_ = Pose3d(x, y, theta);
-  preprocess();
+  Pose3d new_goal(x, y, theta);
+
+  bool loc_changed = utils::distance(new_goal, end_) >= distance_tolerance_;
+
+  end_ = new_goal;
+
+  if (loc_changed ||
+      (int)holonomic_with_obstacle_cost_.size() != height_ * width_)
+    preprocess();
 }
 
 void HybridAStar::setStart(double x, double y, double theta) {
@@ -128,7 +136,7 @@ std::vector<Pose2d> HybridAStar::getPlan() {
 }
 
 State3d HybridAStar::poseToState(const Pose3d &p) {
-  auto [x, y] = grid_->worldToMapDiscrete(p.x, p.y);
+  auto [x, y] = costmap_->worldToMapDiscrete(p.x, p.y);
 
   double theta_deg = p.theta * 180.0 / M_PI;
   theta_deg = std::fmod(theta_deg, 360.0);
@@ -140,21 +148,21 @@ State3d HybridAStar::poseToState(const Pose3d &p) {
 }
 
 State2d HybridAStar::pose2dToState2d(const Pose2d &p) {
-  return State2d(grid_->worldToMapDiscrete(p.x, p.y));
+  return State2d(costmap_->worldToMapDiscrete(p.x, p.y));
 }
 
 Pose2d HybridAStar::state2dToPose2d(const State2d &s) {
-  return Pose2d(grid_->mapToWorld(s.x, s.y));
+  return Pose2d(costmap_->mapToWorld(s.x, s.y));
 }
 
 void HybridAStar::preprocess() {
   holonomic_with_obstacle_cost_.assign(height_ * width_,
                                        std::numeric_limits<double>::infinity());
-  auto [start_x, start_y] = grid_->worldToMapDiscrete(end_.x, end_.y);
-  if (!grid_->isValid(start_x, start_y))
+  auto [start_x, start_y] = costmap_->worldToMapDiscrete(end_.x, end_.y);
+  if (!costmap_->isValid(start_x, start_y))
     return;
 
-  int start_idx = grid_->getIndex(start_x, start_y);
+  int start_idx = costmap_->getIndex(start_x, start_y);
 
   std::priority_queue<std::pair<double, int>,
                       std::vector<std::pair<double, int>>, std::greater<>>
@@ -177,14 +185,20 @@ void HybridAStar::preprocess() {
       int new_x = x + dx_[i];
       int new_y = y + dy_[i];
 
-      if (!grid_->isValid(new_x, new_y))
+      if (!costmap_->isValid(new_x, new_y))
         continue;
 
-      int new_idx = grid_->getIndex(new_x, new_y);
+      int new_idx = costmap_->getIndex(new_x, new_y);
       double move_cost = (dx_[i] == 0 || dy_[i] == 0)
                              ? map_resolution_
                              : map_resolution_ * 1.41421356;
-      double new_cost = cost + move_cost;
+
+      const double raw_cost = costmap_->getCostAt(new_x, new_y);
+      double normalized_cost = raw_cost / 252.0;
+      normalized_cost = normalized_cost * normalized_cost;
+
+      double new_cost =
+          cost + move_cost * (1.0 + cost_penalty_ * normalized_cost);
 
       if (new_cost < holonomic_with_obstacle_cost_[new_idx]) {
         holonomic_with_obstacle_cost_[new_idx] = new_cost;
@@ -198,6 +212,7 @@ void HybridAStar::simulate() {
   plan_.clear();
 
   Node *start = new Node(start_, this);
+  start->g_cost = 0.0;
   start->h_cost = heuristic(start);
 
   nodes_.reserve(50000);
@@ -247,7 +262,7 @@ void HybridAStar::simulate() {
     for (auto &[nbr_pose, move_penalty] : neighbors) {
       State3d next_state = poseToState(nbr_pose);
 
-      if (!grid_->isValid(next_state.x, next_state.y))
+      if (!costmap_->isValid(next_state.x, next_state.y))
         continue;
 
       const int next_state_idx = next_state.theta_bin * height_ * width_ +
@@ -256,11 +271,18 @@ void HybridAStar::simulate() {
       if (closed[next_state_idx])
         continue;
 
-      int costmap_cost = grid_->getDataAt(next_state.x, next_state.y);
+      const double raw_cost = costmap_->getCostAt(next_state.x, next_state.y);
+      double normalized_cost = raw_cost / 252.0;
+      normalized_cost = normalized_cost * normalized_cost;
+
+      const double traversal_cost =
+          move_penalty *
+          (path_length_weight_ + cost_penalty_ * normalized_cost);
 
       Node *next = new Node(nbr_pose, this, curr);
-      next->g_cost = curr->g_cost + move_penalty + costmap_cost;
+      next->g_cost = curr->g_cost + traversal_cost;
       next->h_cost = heuristic(next);
+
       open.push(next);
       nodes_.push_back(next);
     }
@@ -284,7 +306,8 @@ std::vector<Pose2d> HybridAStar::analyticalExpansion(const Node *node) {
 
     if (i == 1) {
       State2d s0 = pose2dToState2d(p0);
-      if (!grid_->isValid(s0.x, s0.y))
+      if (!costmap_->isValid(s0.x, s0.y) ||
+          costmap_->getCostAt(s0.x, s0.y) >= expansion_cost_)
         return {};
     }
 
@@ -292,12 +315,14 @@ std::vector<Pose2d> HybridAStar::analyticalExpansion(const Node *node) {
       double t = static_cast<double>(j) / (num_samples_ + 1);
       Pose2d interp = p0 + d * t;
       State2d s_interp = pose2dToState2d(interp);
-      if (!grid_->isValid(s_interp.x, s_interp.y))
+      if (!costmap_->isValid(s_interp.x, s_interp.y) ||
+          costmap_->getCostAt(s_interp.x, s_interp.y) >= expansion_cost_)
         return {};
     }
 
     State2d s1 = pose2dToState2d(p1);
-    if (!grid_->isValid(s1.x, s1.y))
+    if (!costmap_->isValid(s1.x, s1.y) ||
+        costmap_->getCostAt(s1.x, s1.y) >= expansion_cost_)
       return {};
   }
 
@@ -310,8 +335,8 @@ double HybridAStar::heuristic(const Node *node) {
   double h_2d = utils::distance(node->pose, end_);
 
   double h1 = std::max(h_mm, h_2d);
-  double h2 = holonomic_with_obstacle_cost_[grid_->getIndex(node->state.x,
-                                                           node->state.y)];
+  double h2 = holonomic_with_obstacle_cost_[costmap_->getIndex(node->state.x,
+                                                               node->state.y)];
   return std::max(h1, h2);
 }
 
@@ -342,14 +367,14 @@ std::vector<std::pair<Pose3d, double>> HybridAStar::expand(const Node *node) {
       temp.x += expand_ds_ * std::cos(temp.theta) * dir;
       temp.y += expand_ds_ * std::sin(temp.theta) * dir;
 
-      if (std::abs(omega) > 1e-6) {
+      if (std::abs(omega) > epsilon_) {
         double dtheta = omega * (expand_ds_ / std::abs(u));
         temp.theta += dtheta;
         temp.theta = std::atan2(std::sin(temp.theta), std::cos(temp.theta));
       }
 
-      auto [gx, gy] = grid_->worldToMapDiscrete(temp.x, temp.y);
-      if (!grid_->isValid(gx, gy)) {
+      auto [gx, gy] = costmap_->worldToMapDiscrete(temp.x, temp.y);
+      if (!costmap_->isValid(gx, gy)) {
         collision = true;
         break;
       }
@@ -358,15 +383,19 @@ std::vector<std::pair<Pose3d, double>> HybridAStar::expand(const Node *node) {
     if (!collision) {
       double cost = expand_step_;
 
-      if (std::abs(omega) > 1e-6)
-        cost *= penalty_steering_;
+      bool is_steering = std::abs(omega) > epsilon_;
+      bool parent_steering = std::abs(parent_omega) > epsilon_;
+      bool steering_changed = node->parent && is_steering && parent_steering &&
+                              (omega * parent_omega < 0.0);
 
-      if (node->parent && ((omega > 1e-6) != (parent_omega > 1e-6)) &&
-          (std::abs(omega) > 1e-6 || std::abs(parent_omega) > 1e-6))
-        cost *= penalty_change_steering_;
+      if (is_steering) {
+        cost *= steering_changed
+                    ? (steering_penalty_ * change_steering_penalty_)
+                    : steering_penalty_;
+      }
 
       if (u < 0.0)
-        cost *= penalty_reverse_;
+        cost *= reverse_penalty_;
 
       neighbors.emplace_back(temp, cost);
     }
