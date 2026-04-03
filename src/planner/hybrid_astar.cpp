@@ -56,17 +56,33 @@ HybridAStar::HybridAStar() {
   angular_tolerance_ = 0.1;
   distance_tolerance_ = 0.5;
 
+  analytical_expansion_ratio_ = 3.5;
+  analytical_expansion_max_dist_ = 3.0;
+
+  steering_penalty_ = 0.5;
+  change_steering_penalty_ = 0.1;
+  reverse_penalty_ = 2.0;
+  cost_penalty_ = 30.0;
+  expansion_cost_ = 200.0;
+  path_length_weight_ = 0.985;
+
   map_resolution_ = 0.05;
-  expand_step_ = std::min(1.41421356 * map_resolution_, distance_resolution_);
+  expand_step_ = 1.41421356 * map_resolution_;
   expand_ds_ = expand_step_ / num_samples_;
 
   motion_model_.setMotionModel(MotionModelType::REED_SHEPPS);
   motion_model_.setDistanceResolution(distance_resolution_);
   motion_model_.setMinTurningRadius(1);
+
+  controls_count_ = 6;
 }
 
 void HybridAStar::setMotionModel(MotionModelType type) {
   motion_model_.setMotionModel(type);
+  if (type == MotionModelType::REED_SHEPPS)
+    controls_count_ = 6;
+  else
+    controls_count_ = 3;
 }
 
 void HybridAStar::setCostmap(const costmap::Costmap *costmap) {
@@ -226,6 +242,7 @@ void HybridAStar::simulate() {
   open.push(start);
 
   int count = 0;
+  double accumulator = 0.0;
 
   while (!open.empty()) {
     Node *curr = open.top();
@@ -245,16 +262,20 @@ void HybridAStar::simulate() {
       return;
     }
 
-    std::vector<Pose2d> analytical_expansion = analyticalExpansion(curr);
-    if (!analytical_expansion.empty()) {
-      while (curr) {
-        plan_.push_back(curr->pose);
-        curr = curr->parent;
+    if (accumulator >= analytical_expansion_ratio_) {
+      std::vector<Pose2d> analytical_expansion = analyticalExpansion(curr);
+      if (!analytical_expansion.empty()) {
+        while (curr) {
+          plan_.push_back(curr->pose);
+          curr = curr->parent;
+        }
+        std::reverse(plan_.begin(), plan_.end());
+        plan_.insert(plan_.end(), analytical_expansion.begin(),
+                     analytical_expansion.end());
+        return;
       }
-      std::reverse(plan_.begin(), plan_.end());
-      plan_.insert(plan_.end(), analytical_expansion.begin(),
-                   analytical_expansion.end());
-      return;
+
+      accumulator = 0.0;
     }
 
     std::vector<std::pair<Pose3d, double>> neighbors = expand(curr);
@@ -287,6 +308,7 @@ void HybridAStar::simulate() {
       nodes_.push_back(next);
     }
 
+    accumulator += 1.0;
     if (++count > 50000)
       break;
   }
@@ -294,6 +316,10 @@ void HybridAStar::simulate() {
 
 std::vector<Pose2d> HybridAStar::analyticalExpansion(const Node *node) {
   motion_model_.simulate(node->pose, end_);
+
+  double mm_dist = motion_model_.getOptimalDistance();
+  if (mm_dist >= analytical_expansion_max_dist_)
+    return {};
 
   std::vector<Pose2d> mm_path = motion_model_.getOptimalPath();
   if (mm_path.empty())
@@ -349,7 +375,7 @@ bool HybridAStar::goalReached(const Node *node) {
 
 std::vector<std::pair<Pose3d, double>> HybridAStar::expand(const Node *node) {
   std::vector<std::pair<Pose3d, double>> neighbors;
-  neighbors.reserve(controls_.size());
+  neighbors.reserve(controls_count_);
 
   double parent_omega = 0.0;
   if (node->parent) {
@@ -357,7 +383,8 @@ std::vector<std::pair<Pose3d, double>> HybridAStar::expand(const Node *node) {
     parent_omega = std::atan2(std::sin(dtheta), std::cos(dtheta));
   }
 
-  for (auto [u, omega] : controls_) {
+  for (int k = 0; k < controls_count_; k++) {
+    auto [u, omega] = controls_[k];
     Pose3d temp = node->pose;
     bool collision = false;
 

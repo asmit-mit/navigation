@@ -2,7 +2,6 @@
 #include <functional>
 #include <iostream>
 #include <memory>
-#include <unordered_map>
 #include <vector>
 
 #include "geometry_msgs/msg/pose_stamped.hpp"
@@ -13,6 +12,7 @@
 #include "tf2/LinearMath/Matrix3x3.hpp"
 #include "tf2_geometry_msgs/tf2_geometry_msgs.hpp"
 
+#include "planner/motion_model.h"
 #include "costmap/costmap.h"
 #include "planner/hybrid_astar.h"
 
@@ -140,6 +140,7 @@ private:
     planner.setStart(start_x, start_y, start_theta);
     planner.setGoal(goal_x, goal_y, goal_theta);
     planner.setResolutions(0.1, 5);
+    planner.setMotionModel(planner::MotionModelType::DUBINS);
 
     auto start = std::chrono::steady_clock::now();
 

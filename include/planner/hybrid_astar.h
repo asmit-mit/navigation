@@ -77,19 +77,22 @@ private:
   double expand_step_;
   double expand_ds_;
 
-  Pose3d start_, end_;
+  double analytical_expansion_ratio_;
+  double analytical_expansion_max_dist_;
 
-  static constexpr int num_samples_ = 5;
+  double steering_penalty_;
+  double change_steering_penalty_;
+  double reverse_penalty_;
+  double cost_penalty_;
+  double expansion_cost_;
+  double path_length_weight_;
+
+  Pose3d start_, end_;
 
   static constexpr int dx_[8] = {-1, 1, -1, 0, 1, -1, 0, 1};
   static constexpr int dy_[8] = {0, 0, 1, 1, 1, -1, -1, -1};
 
-  static constexpr double steering_penalty_ = 1.7;
-  static constexpr double change_steering_penalty_ = 0.1;
-  static constexpr double reverse_penalty_ = 2.0;
-  static constexpr double cost_penalty_ = 15.0;
-  static constexpr double expansion_cost_ = 200.0;
-  static constexpr double path_length_weight_ = 0.985;
+  static constexpr int num_samples_ = 5;
   static constexpr double epsilon_ = 1e-6;
 
   const costmap::Costmap *costmap_;
@@ -98,9 +101,10 @@ private:
 
   std::vector<double> holonomic_with_obstacle_cost_;
   std::vector<Pose2d> plan_;
-
   std::vector<Node *> nodes_;
+
   std::array<std::pair<double, double>, 6> controls_;
+  int controls_count_;
 
   friend class Node;
 };
