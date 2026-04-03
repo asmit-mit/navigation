@@ -44,8 +44,8 @@ bool HybridAStar::NodeEqual::operator()(Node *a, Node *b) const {
 }
 
 HybridAStar::HybridAStar() {
-  optimizer_.setStepSize(0.0001);
-  optimizer_.setIterations(500);
+  optimizer_.setIterations(100);
+  optimizer_.setWeights(0.3, 0.2);
 
   max_angular_velocity_ = 0.5;
   max_linear_velocity_ = 2;
@@ -148,6 +148,7 @@ void HybridAStar::setIterations(int iterations) {
 std::vector<Pose2d> HybridAStar::getPlan() {
   simulate();
   freeNodes();
+  plan_ = optimizer_.getSmoothPath(plan_);
   return plan_;
 }
 

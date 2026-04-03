@@ -1,65 +1,69 @@
 #include "planner/optimizer.h"
-
 #include <cmath>
+#include <iostream>
+
+using std::cout;
+using std::endl;
 
 namespace planner {
 
-Optimizer::Optimizer() {}
+Optimizer::Optimizer()
+    : iterations_(10), smooth_weight_(0.1), data_weight_(0.5) {}
 
-Optimizer::Grad::Grad() {
-  x = 0;
-  y = 0;
-}
-
-Optimizer::Grad::Grad(double x, double y) : x(x), y(y) {}
-
-Optimizer::Grad Optimizer::Grad::operator*(double scalar) const {
-  return Grad(x * scalar, y * scalar);
-}
-
-Optimizer::Grad Optimizer::Grad::operator+(const Grad &other) const {
-  return Grad(x + other.x, y + other.y);
+void Optimizer::setWeights(double smooth, double data) {
+  smooth_weight_ = smooth;
+  data_weight_ = data;
 }
 
 void Optimizer::setIterations(int iterations) { iterations_ = iterations; }
 
-void Optimizer::setStepSize(double step_size) { step_ = step_size; }
-
 std::vector<Pose2d> Optimizer::getSmoothPath(std::vector<Pose2d> &plan) {
-  const int n = plan.size();
-  grad_.resize(n);
+  if (plan.size() < 3)
+    return plan;
 
-  int it = 0;
-  while (it < iterations_) {
-    it++;
+  std::vector<Pose2d> new_path = plan;
+  std::vector<Pose2d> last_path = plan;
 
-    for (Grad &g : grad_) {
-      g.x = 0;
-      g.y = 0;
+  const double tolerance = 1e-6;
+
+  for (int iter = 0; iter < iterations_; iter++) {
+    double change = 0.0;
+
+    for (size_t i = 1; i < plan.size() - 1; i++) {
+      double x_i = plan[i].x;
+      double y_i = new_path[i].x;
+      double y_prev = new_path[i - 1].x;
+      double y_next = new_path[i + 1].x;
+
+      double y_i_old = y_i;
+
+      y_i += data_weight_ * (x_i - y_i) +
+             smooth_weight_ * (y_next + y_prev - 2.0 * y_i);
+
+      new_path[i].x = y_i;
+      change += std::fabs(y_i - y_i_old);
+
+      double x_i_y = plan[i].y;
+      double y_i_y = new_path[i].y;
+      double y_prev_y = new_path[i - 1].y;
+      double y_next_y = new_path[i + 1].y;
+
+      double y_i_old_y = y_i_y;
+
+      y_i_y += data_weight_ * (x_i_y - y_i_y) +
+               smooth_weight_ * (y_next_y + y_prev_y - 2.0 * y_i_y);
+
+      new_path[i].y = y_i_y;
+      change += std::fabs(y_i_y - y_i_old_y);
     }
 
-    for (int i = 1; i < n - 1; i++) {
-      // do costs here
-    }
+    if (change < tolerance)
+      break;
 
-    grad_[0] = Grad(0, 0);
-    grad_[n - 1] = Grad(0, 0);
-
-    for (int j = 1; j < n - 1; j++) {
-      double norm = std::hypot(grad_[j].x, grad_[j].y);
-      double max_grad = 5.0;
-
-      if (norm > max_grad) {
-        grad_[j].x *= max_grad / norm;
-        grad_[j].y *= max_grad / norm;
-      }
-
-      plan[j].x -= step_ * grad_[j].x;
-      plan[j].y -= step_ * grad_[j].y;
-    }
+    last_path = new_path;
   }
 
-  return plan;
+  return new_path;
 }
 
-}; // namespace planner
+} // namespace planner

@@ -141,6 +141,7 @@ private:
     planner.setGoal(goal_x, goal_y, goal_theta);
     planner.setResolutions(0.1, 5);
     planner.setMotionModel(planner::MotionModelType::DUBINS);
+    planner.setIterations(100);
 
     auto start = std::chrono::steady_clock::now();
 
