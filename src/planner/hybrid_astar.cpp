@@ -239,7 +239,8 @@ void HybridAStar::simulate() {
   const int state_space_size = height_ * width_ * num_theta_bins;
 
   std::priority_queue<Node *, std::vector<Node *>, CompareNode> open;
-  std::vector<bool> closed(state_space_size, false);
+  std::vector<double> g_costs(state_space_size,
+                             std::numeric_limits<double>::infinity());
   open.push(start);
 
   int count = 0;
@@ -250,9 +251,8 @@ void HybridAStar::simulate() {
     open.pop();
 
     const int curr_idx = curr->getStateIndex();
-    if (closed[curr_idx])
+    if (curr->g_cost > g_costs[curr_idx])
       continue;
-    closed[curr_idx] = true;
 
     if (goalReached(curr)) {
       while (curr) {
@@ -290,9 +290,6 @@ void HybridAStar::simulate() {
       const int next_state_idx = next_state.theta_bin * height_ * width_ +
                                  next_state.y * width_ + next_state.x;
 
-      if (closed[next_state_idx])
-        continue;
-
       const double raw_cost = costmap_->getCostAt(next_state.x, next_state.y);
       double normalized_cost = raw_cost / 252.0;
       normalized_cost = normalized_cost * normalized_cost;
@@ -301,8 +298,15 @@ void HybridAStar::simulate() {
           move_penalty *
           (path_length_weight_ + cost_penalty_ * normalized_cost);
 
+      const double new_g_cost = curr->g_cost + traversal_cost;
+
+      if (new_g_cost >= g_costs[next_state_idx])
+        continue;
+
+      g_costs[next_state_idx] = new_g_cost;
+
       Node *next = new Node(nbr_pose, this, curr);
-      next->g_cost = curr->g_cost + traversal_cost;
+      next->g_cost = new_g_cost;
       next->h_cost = heuristic(next);
 
       open.push(next);
