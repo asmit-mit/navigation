@@ -1,6 +1,7 @@
 #include <chrono>
 #include <functional>
 #include <iostream>
+#include <unordered_set>
 #include <memory>
 #include <vector>
 
@@ -12,8 +13,8 @@
 #include "tf2/LinearMath/Matrix3x3.hpp"
 #include "tf2_geometry_msgs/tf2_geometry_msgs.hpp"
 
-#include "planner/motion_model.h"
 #include "costmap/costmap.h"
+#include "planner/motion_model.h"
 #include "planner/hybrid_astar.h"
 
 using namespace std::placeholders;
@@ -53,9 +54,7 @@ private:
     latest_map_ = msg;
 
     costmap.setGrid(latest_map_);
-    costmap.setScalingFactor(5.0);
-    costmap.setRadius(0.3);
-    costmap.setAllowUnknown(true);
+    costmap.setParameters(1.4, 2.0);
     costmap.computeCostmap();
 
     int size = costmap.getHeight() * costmap.getWidth();
@@ -64,14 +63,21 @@ private:
     costmap_msg_.info = msg->info;
     costmap_msg_.data.resize(size);
 
+    std::unordered_set<int> seen;
+
     for (int i = 0; i < size; i++) {
       if (msg->data[i] == 100) {
         costmap_msg_.data[i] = 100;
       } else {
+        seen.insert(costmap.getCostAt(i));
         double c = costmap.getCostAt(i);
         costmap_msg_.data[i] = static_cast<int8_t>(std::min(100.0, c / 2.55));
       }
     }
+
+    for (auto c : seen)
+     cout << c << " ";
+    cout << endl;
 
     RCLCPP_INFO(this->get_logger(), "Publishing costmap");
     map_pub_->publish(costmap_msg_);

@@ -9,13 +9,11 @@ namespace costmap {
 
 class Costmap : public GridMap {
 public:
-  Costmap() {}
+  Costmap();
 
   void setGrid(nav_msgs::msg::OccupancyGrid::SharedPtr grid) override;
+  void setParameters(double radius, double scaling_factor);
 
-  void setRadius(double radius);
-  void setScalingFactor(double scaling_factor);
-  void setAllowUnknown(bool allow_unknown);
   void computeCostmap();
 
   double getCostAt(int idx) const;
@@ -23,20 +21,22 @@ public:
 
 private:
   void computeDT1D(int start, int size, int stride);
+  void computeDT();
+  double computeCost(double dist);
+  void computeDistToCostMap();
 
 private:
-  double radius_, scaling_factor_;
-  bool allow_unknown_;
+  double inflation_radius_, inscribed_radius_;
+  double scaling_factor_;
 
   static constexpr double INF = std::numeric_limits<double>::infinity();
+  static constexpr double epsilon_ = 1e-6;
 
-  static constexpr uint8_t COST_UNKNOWN_ROS = 255;
-  static constexpr uint8_t COST_OBS_ROS = 253;
-  static constexpr uint8_t COST_OBS = 254;
+  static constexpr int COST_PRECISION = 100;
+  static constexpr double LETHAL_COST = 254.0;
+  static constexpr double INSCRIBED_COST = 253.0;
 
-  static constexpr double COST_NEUTRAL = 50.0;
-  static constexpr double COST_FACTOR = 0.8;
-
+  std::vector<double> dist_to_cost_;
   std::vector<double> costmap_;
 };
 

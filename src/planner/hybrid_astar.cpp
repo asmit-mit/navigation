@@ -62,7 +62,7 @@ HybridAStar::HybridAStar() {
   steering_penalty_ = 0.5;
   change_steering_penalty_ = 0.1;
   reverse_penalty_ = 2.0;
-  cost_penalty_ = 30.0;
+  cost_penalty_ = 6.0;
   expansion_cost_ = 200.0;
   path_length_weight_ = 0.985;
 
