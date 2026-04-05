@@ -13,7 +13,7 @@ public:
   void setWeights(double smooth, double data);
   void setIterations(int iterations);
 
-  std::vector<Pose2d> getSmoothPath(std::vector<Pose2d> &plan);
+  std::vector<Pose2d> getSmoothPath(std::vector<Pose2d> &plan) const;
 
 private:
   int iterations_;

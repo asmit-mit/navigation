@@ -29,6 +29,8 @@ void MotionModel::simulate(const Pose3d &start, const Pose3d &end) {
   }
 }
 
+MotionModelType MotionModel::getType() const { return type_; }
+
 double MotionModel::getOptimalDistance() {
   if (type_ == MotionModelType::DUBINS) {
     return dubins_.getOptimalDistance();

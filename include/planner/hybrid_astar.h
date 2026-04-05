@@ -13,14 +13,15 @@ class HybridAStar {
 public:
   HybridAStar();
 
-  void setMotionModel(MotionModelType type);
   void setCostmap(const costmap::Costmap *costmap);
+  void setOptimizer(const Optimizer *optimizer);
+  void setMotionModel(MotionModel *motion_model);
+
   void setTolerance(double angle, double distance);
   void setResolutions(double distance, double angle);
   void setVelocities(double linear, double angluar);
   void setStart(double x, double y, double theta);
   void setGoal(double x, double y, double theta);
-  void setIterations(int iterations);
   std::vector<Pose2d> getPlan();
 
 private:
@@ -96,8 +97,8 @@ private:
   static constexpr double epsilon_ = 1e-6;
 
   const costmap::Costmap *costmap_;
-  MotionModel motion_model_;
-  Optimizer optimizer_;
+  const Optimizer *optimizer_;
+  MotionModel *motion_model_;
 
   std::vector<double> holonomic_with_obstacle_cost_;
   std::vector<Pose2d> plan_;

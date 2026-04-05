@@ -1,8 +1,8 @@
 #include <chrono>
 #include <functional>
 #include <iostream>
-#include <unordered_set>
 #include <memory>
+#include <unordered_set>
 #include <vector>
 
 #include "geometry_msgs/msg/pose_stamped.hpp"
@@ -14,8 +14,9 @@
 #include "tf2_geometry_msgs/tf2_geometry_msgs.hpp"
 
 #include "costmap/costmap.h"
-#include "planner/motion_model.h"
 #include "planner/hybrid_astar.h"
+#include "planner/motion_model.h"
+#include "planner/optimizer.h"
 
 using namespace std::placeholders;
 using namespace std::chrono_literals;
@@ -53,11 +54,11 @@ private:
   void mapCallback(const nav_msgs::msg::OccupancyGrid::SharedPtr msg) {
     latest_map_ = msg;
 
-    costmap.setGrid(latest_map_);
-    costmap.setParameters(1.4, 2.0);
-    costmap.computeCostmap();
+    costmap_.setGrid(latest_map_);
+    costmap_.setParameters(1.4, 2.0);
+    costmap_.computeCostmap();
 
-    int size = costmap.getHeight() * costmap.getWidth();
+    int size = costmap_.getHeight() * costmap_.getWidth();
 
     costmap_msg_.header = msg->header;
     costmap_msg_.info = msg->info;
@@ -69,14 +70,14 @@ private:
       if (msg->data[i] == 100) {
         costmap_msg_.data[i] = 100;
       } else {
-        seen.insert(costmap.getCostAt(i));
-        double c = costmap.getCostAt(i);
+        seen.insert(costmap_.getCostAt(i));
+        double c = costmap_.getCostAt(i);
         costmap_msg_.data[i] = static_cast<int8_t>(std::min(100.0, c / 2.55));
       }
     }
 
     for (auto c : seen)
-     cout << c << " ";
+      cout << c << " ";
     cout << endl;
 
     RCLCPP_INFO(this->get_logger(), "Publishing costmap");
@@ -108,20 +109,6 @@ private:
     if (!latest_map_ || !have_start_ || !have_goal_)
       return;
 
-    // start_pose_.pose.position.x = -0.444698;
-    // start_pose_.pose.position.y = -1.91125;
-    // start_pose_.pose.orientation.x = 0;
-    // start_pose_.pose.orientation.y = 0;
-    // start_pose_.pose.orientation.z = 0.0611258;
-    // start_pose_.pose.orientation.w = 0.99813;
-    //
-    // goal_pose_.pose.position.x = -0.821665;
-    // goal_pose_.pose.position.y = 3.29122;
-    // goal_pose_.pose.orientation.x = 0;
-    // goal_pose_.pose.orientation.y = 0;
-    // goal_pose_.pose.orientation.z = 0.177572;
-    // goal_pose_.pose.orientation.w = 0.984108;
-
     double start_x = start_pose_.pose.position.x;
     double start_y = start_pose_.pose.position.y;
 
@@ -140,18 +127,28 @@ private:
 
     RCLCPP_INFO(this->get_logger(), "Start: %f %f", start_x, start_y);
     RCLCPP_INFO(this->get_logger(), "Goal: %f %f", goal_x, goal_y);
-    planner.setCostmap(&costmap);
-    planner.setVelocities(1.5, 2);
-    planner.setTolerance(0.5, 0.2);
-    planner.setStart(start_x, start_y, start_theta);
-    planner.setGoal(goal_x, goal_y, goal_theta);
-    planner.setResolutions(0.1, 5);
-    planner.setMotionModel(planner::MotionModelType::DUBINS);
-    planner.setIterations(100);
+
+    optimizer_.setIterations(1000);
+    optimizer_.setWeights(0.3, 0.2);
+
+    motion_model_.setMotionModel(planner::MotionModelType::DUBINS);
+    motion_model_.setDistanceResolution(0.1);
+    motion_model_.setMinTurningRadius(1.5 / 2);
+    motion_model_.setTolerance(0.5, 0.2);
+
+    planner_.setCostmap(&costmap_);
+    planner_.setMotionModel(&motion_model_);
+    planner_.setOptimizer(&optimizer_);
+
+    planner_.setVelocities(1.5, 2);
+    planner_.setTolerance(0.5, 0.2);
+    planner_.setStart(start_x, start_y, start_theta);
+    planner_.setGoal(goal_x, goal_y, goal_theta);
+    planner_.setResolutions(0.1, 5);
 
     auto start = std::chrono::steady_clock::now();
 
-    std::vector<planner::Pose2d> path = planner.getPlan();
+    std::vector<planner::Pose2d> path = planner_.getPlan();
 
     auto end = std::chrono::steady_clock::now();
 
@@ -205,8 +202,10 @@ private:
   geometry_msgs::msg::PoseStamped start_pose_;
   geometry_msgs::msg::PoseStamped goal_pose_;
 
-  costmap::Costmap costmap;
-  planner::HybridAStar planner;
+  costmap::Costmap costmap_;
+  planner::HybridAStar planner_;
+  planner::Optimizer optimizer_;
+  planner::MotionModel motion_model_;
 
   bool have_start_ = false;
   bool have_goal_ = false;

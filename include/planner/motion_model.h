@@ -18,9 +18,12 @@ public:
   void setDistanceResolution(double resolution);
   void setTolerance(double angle, double distance);
   void setMinTurningRadius(double min_radius);
-  void simulate(const Pose3d &start, const Pose3d &end);
+
+  MotionModelType getType() const;
   double getOptimalDistance();
   std::vector<Pose2d> getOptimalPath();
+
+  void simulate(const Pose3d &start, const Pose3d &end);
 
 private:
   MotionModelType type_;

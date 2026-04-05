@@ -44,9 +44,6 @@ bool HybridAStar::NodeEqual::operator()(Node *a, Node *b) const {
 }
 
 HybridAStar::HybridAStar() {
-  optimizer_.setIterations(100);
-  optimizer_.setWeights(0.3, 0.2);
-
   max_angular_velocity_ = 0.5;
   max_linear_velocity_ = 2;
 
@@ -69,20 +66,18 @@ HybridAStar::HybridAStar() {
   map_resolution_ = 0.05;
   expand_step_ = 1.41421356 * map_resolution_;
   expand_ds_ = expand_step_ / num_samples_;
-
-  motion_model_.setMotionModel(MotionModelType::REED_SHEPPS);
-  motion_model_.setDistanceResolution(distance_resolution_);
-  motion_model_.setMinTurningRadius(1);
-
-  controls_count_ = 6;
 }
 
-void HybridAStar::setMotionModel(MotionModelType type) {
-  motion_model_.setMotionModel(type);
-  if (type == MotionModelType::REED_SHEPPS)
+void HybridAStar::setMotionModel(MotionModel *motion_model) {
+  motion_model_ = motion_model;
+  if (motion_model_->getType() == MotionModelType::REED_SHEPPS)
     controls_count_ = 6;
   else
     controls_count_ = 3;
+}
+
+void HybridAStar::setOptimizer(const Optimizer *optimizer) {
+  optimizer_ = optimizer;
 }
 
 void HybridAStar::setCostmap(const costmap::Costmap *costmap) {
@@ -105,8 +100,6 @@ void HybridAStar::setResolutions(double distance, double angle) {
   distance_resolution_ = distance;
   angular_resolution_ = angle;
 
-  motion_model_.setDistanceResolution(distance_resolution_);
-
   expand_step_ = std::min(map_resolution_, distance_resolution_);
   expand_ds_ = expand_step_ / num_samples_;
 }
@@ -114,8 +107,6 @@ void HybridAStar::setResolutions(double distance, double angle) {
 void HybridAStar::setVelocities(double linear, double angular) {
   max_linear_velocity_ = linear;
   max_angular_velocity_ = angular;
-
-  motion_model_.setMinTurningRadius(linear / angular);
 
   controls_[0] = {max_linear_velocity_, 0.0};
   controls_[1] = {max_linear_velocity_, max_angular_velocity_};
@@ -141,14 +132,10 @@ void HybridAStar::setStart(double x, double y, double theta) {
   start_ = Pose3d(x, y, theta);
 }
 
-void HybridAStar::setIterations(int iterations) {
-  optimizer_.setIterations(iterations);
-}
-
 std::vector<Pose2d> HybridAStar::getPlan() {
   simulate();
   freeNodes();
-  plan_ = optimizer_.getSmoothPath(plan_);
+  plan_ = optimizer_->getSmoothPath(plan_);
   return plan_;
 }
 
@@ -240,7 +227,7 @@ void HybridAStar::simulate() {
 
   std::priority_queue<Node *, std::vector<Node *>, CompareNode> open;
   std::vector<double> g_costs(state_space_size,
-                             std::numeric_limits<double>::infinity());
+                              std::numeric_limits<double>::infinity());
   open.push(start);
 
   int count = 0;
@@ -320,13 +307,13 @@ void HybridAStar::simulate() {
 }
 
 std::vector<Pose2d> HybridAStar::analyticalExpansion(const Node *node) {
-  motion_model_.simulate(node->pose, end_);
+  motion_model_->simulate(node->pose, end_);
 
-  double mm_dist = motion_model_.getOptimalDistance();
+  double mm_dist = motion_model_->getOptimalDistance();
   if (mm_dist >= analytical_expansion_max_dist_)
     return {};
 
-  std::vector<Pose2d> mm_path = motion_model_.getOptimalPath();
+  std::vector<Pose2d> mm_path = motion_model_->getOptimalPath();
   if (mm_path.empty())
     return {};
 
@@ -361,8 +348,8 @@ std::vector<Pose2d> HybridAStar::analyticalExpansion(const Node *node) {
 }
 
 double HybridAStar::heuristic(const Node *node) {
-  motion_model_.simulate(node->pose, end_);
-  double h_mm = motion_model_.getOptimalDistance();
+  motion_model_->simulate(node->pose, end_);
+  double h_mm = motion_model_->getOptimalDistance();
   double h_2d = utils::distance(node->pose, end_);
 
   double h1 = std::max(h_mm, h_2d);
