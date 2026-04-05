@@ -18,6 +18,8 @@ public:
 private:
   int iterations_;
   double smooth_weight_, data_weight_;
+
+  static constexpr double epsilon_ = 1e-6;
 };
 
 }; // namespace planner

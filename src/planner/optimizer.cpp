@@ -1,9 +1,6 @@
 #include "planner/optimizer.h"
-#include <cmath>
-#include <iostream>
 
-using std::cout;
-using std::endl;
+#include <cmath>
 
 namespace planner {
 
@@ -23,8 +20,6 @@ std::vector<Pose2d> Optimizer::getSmoothPath(std::vector<Pose2d> &plan) const {
 
   std::vector<Pose2d> new_path = plan;
   std::vector<Pose2d> last_path = plan;
-
-  const double tolerance = 1e-6;
 
   for (int iter = 0; iter < iterations_; iter++) {
     double change = 0.0;
@@ -57,7 +52,7 @@ std::vector<Pose2d> Optimizer::getSmoothPath(std::vector<Pose2d> &plan) const {
       change += std::fabs(y_i_y - y_i_old_y);
     }
 
-    if (change < tolerance)
+    if (change < epsilon_)
       break;
 
     last_path = new_path;

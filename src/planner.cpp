@@ -2,7 +2,6 @@
 #include <functional>
 #include <iostream>
 #include <memory>
-#include <unordered_set>
 #include <vector>
 
 #include "geometry_msgs/msg/pose_stamped.hpp"
@@ -64,21 +63,14 @@ private:
     costmap_msg_.info = msg->info;
     costmap_msg_.data.resize(size);
 
-    std::unordered_set<int> seen;
-
     for (int i = 0; i < size; i++) {
       if (msg->data[i] == 100) {
         costmap_msg_.data[i] = 100;
       } else {
-        seen.insert(costmap_.getCostAt(i));
         double c = costmap_.getCostAt(i);
         costmap_msg_.data[i] = static_cast<int8_t>(std::min(100.0, c / 2.55));
       }
     }
-
-    for (auto c : seen)
-      cout << c << " ";
-    cout << endl;
 
     RCLCPP_INFO(this->get_logger(), "Publishing costmap");
     map_pub_->publish(costmap_msg_);
@@ -136,15 +128,17 @@ private:
     motion_model_.setMinTurningRadius(1.5 / 2);
     motion_model_.setTolerance(0.5, 0.2);
 
-    planner_.setCostmap(&costmap_);
-    planner_.setMotionModel(&motion_model_);
-    planner_.setOptimizer(&optimizer_);
+    planner::HybridAstarParams params;
+    params.max_linear_velocity = 2.0;
+    params.max_angular_velocity = 2.0;
+    params.distance_tolerance = 0.5;
+    params.angular_tolerance = 0.2;
+    params.angular_resolution = 5;
 
-    planner_.setVelocities(1.5, 2);
-    planner_.setTolerance(0.5, 0.2);
+    planner_.setParameters(&costmap_, &optimizer_, &motion_model_, params);
+
     planner_.setStart(start_x, start_y, start_theta);
     planner_.setGoal(goal_x, goal_y, goal_theta);
-    planner_.setResolutions(0.1, 5);
 
     auto start = std::chrono::steady_clock::now();
 

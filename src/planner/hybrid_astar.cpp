@@ -1,14 +1,8 @@
 #include "planner/hybrid_astar.h"
-#include "costmap/costmap.h"
-#include "planner/motion_model.h"
 #include "utils/math_utils.h"
 
-#include <cmath>
 #include <limits>
 #include <queue>
-
-#include <iostream>
-using std::cout;
 
 namespace planner {
 
@@ -35,78 +29,29 @@ bool HybridAStar::CompareNode::operator()(Node *a, Node *b) {
   return (a->g_cost + a->h_cost) > (b->g_cost + b->h_cost);
 }
 
-std::size_t HybridAStar::NodeHash::operator()(Node *node) const {
-  return StateHash()(node->state);
-}
+HybridAStar::HybridAStar() {}
 
-bool HybridAStar::NodeEqual::operator()(Node *a, Node *b) const {
-  return a->state == b->state;
-}
-
-HybridAStar::HybridAStar() {
-  max_angular_velocity_ = 0.5;
-  max_linear_velocity_ = 2;
-
-  angular_resolution_ = 5;
-  distance_resolution_ = 0.5;
-
-  angular_tolerance_ = 0.1;
-  distance_tolerance_ = 0.5;
-
-  analytical_expansion_ratio_ = 3.5;
-  analytical_expansion_max_dist_ = 3.0;
-
-  steering_penalty_ = 0.5;
-  change_steering_penalty_ = 0.1;
-  reverse_penalty_ = 2.0;
-  cost_penalty_ = 6.0;
-  expansion_cost_ = 200.0;
-  path_length_weight_ = 0.985;
-
-  map_resolution_ = 0.05;
-  expand_step_ = 1.41421356 * map_resolution_;
-  expand_ds_ = expand_step_ / num_samples_;
-}
-
-void HybridAStar::setMotionModel(MotionModel *motion_model) {
-  motion_model_ = motion_model;
-  if (motion_model_->getType() == MotionModelType::REED_SHEPPS)
-    controls_count_ = 6;
-  else
-    controls_count_ = 3;
-}
-
-void HybridAStar::setOptimizer(const Optimizer *optimizer) {
-  optimizer_ = optimizer;
-}
-
-void HybridAStar::setCostmap(const costmap::Costmap *costmap) {
+void HybridAStar::setParameters(const costmap::Costmap *costmap,
+                                const Optimizer *optimizer,
+                                MotionModel *motion_model,
+                                const HybridAstarParams &params) {
   costmap_ = costmap;
+  optimizer_ = optimizer;
+  motion_model_ = motion_model;
+
+  controls_count_ =
+      (motion_model_->getType() == MotionModelType::REED_SHEPPS) ? 6 : 3;
 
   height_ = costmap_->getHeight();
   width_ = costmap_->getWidth();
   map_resolution_ = costmap_->getResolution();
 
-  expand_step_ = std::min(1.41421356 * map_resolution_, distance_resolution_);
+  expand_step_ = 1.41421356 * map_resolution_;
   expand_ds_ = expand_step_ / num_samples_;
-}
 
-void HybridAStar::setTolerance(double angle, double distance) {
-  angular_tolerance_ = angle;
-  distance_tolerance_ = distance;
-}
-
-void HybridAStar::setResolutions(double distance, double angle) {
-  distance_resolution_ = distance;
-  angular_resolution_ = angle;
-
-  expand_step_ = std::min(map_resolution_, distance_resolution_);
-  expand_ds_ = expand_step_ / num_samples_;
-}
-
-void HybridAStar::setVelocities(double linear, double angular) {
-  max_linear_velocity_ = linear;
-  max_angular_velocity_ = angular;
+  // velocities
+  max_angular_velocity_ = params.max_angular_velocity;
+  max_linear_velocity_ = params.max_linear_velocity;
 
   controls_[0] = {max_linear_velocity_, 0.0};
   controls_[1] = {max_linear_velocity_, max_angular_velocity_};
@@ -114,6 +59,32 @@ void HybridAStar::setVelocities(double linear, double angular) {
   controls_[3] = {-max_linear_velocity_, 0.0};
   controls_[4] = {-max_linear_velocity_, max_angular_velocity_};
   controls_[5] = {-max_linear_velocity_, -max_angular_velocity_};
+
+  // resolutions
+  angular_resolution_ = params.angular_resolution;
+
+  // tolerance
+  angular_tolerance_ = params.angular_tolerance;
+  distance_tolerance_ = params.distance_tolerance;
+
+  // analyical expansions
+  analytical_expansion_ratio_ = params.analytical_expansion_ratio;
+  analytical_expansion_max_length_ = params.analytical_expansion_max_length;
+
+  // weights
+  steering_penalty_ = params.steering_penalty;
+  change_steering_penalty_ = params.change_steering_penalty;
+  reverse_penalty_ = params.reverse_penalty;
+  cost_penalty_ = params.cost_penalty;
+  expansion_cost_ = params.expansion_cost;
+  path_length_weight_ = params.path_length_weight;
+
+  max_explore_iterations_ = params.max_explore_iterations;
+  num_theta_bins_ = static_cast<int>(360.0 / angular_resolution_);
+  state_space_size_ = height_ * width_ * num_theta_bins_;
+
+  g_cost_table_.resize(state_space_size_, std::numeric_limits<double>::infinity());
+  closed_.resize(state_space_size_, false);
 }
 
 void HybridAStar::setGoal(double x, double y, double theta) {
@@ -125,7 +96,7 @@ void HybridAStar::setGoal(double x, double y, double theta) {
 
   if (loc_changed ||
       (int)holonomic_with_obstacle_cost_.size() != height_ * width_)
-    preprocess();
+    buildObstacleCostTable();
 }
 
 void HybridAStar::setStart(double x, double y, double theta) {
@@ -142,7 +113,7 @@ std::vector<Pose2d> HybridAStar::getPlan() {
 State3d HybridAStar::poseToState(const Pose3d &p) {
   auto [x, y] = costmap_->worldToMapDiscrete(p.x, p.y);
 
-  double theta_deg = p.theta * 180.0 / M_PI;
+  double theta_deg = p.theta * theta_to_deg_;
   theta_deg = std::fmod(theta_deg, 360.0);
   if (theta_deg < 0.0)
     theta_deg += 360.0;
@@ -159,7 +130,7 @@ Pose2d HybridAStar::state2dToPose2d(const State2d &s) {
   return Pose2d(costmap_->mapToWorld(s.x, s.y));
 }
 
-void HybridAStar::preprocess() {
+void HybridAStar::buildObstacleCostTable() {
   holonomic_with_obstacle_cost_.assign(height_ * width_,
                                        std::numeric_limits<double>::infinity());
   auto [start_x, start_y] = costmap_->worldToMapDiscrete(end_.x, end_.y);
@@ -214,22 +185,20 @@ void HybridAStar::preprocess() {
 
 void HybridAStar::simulate() {
   plan_.clear();
+  node_pool_.clear();
+  node_pool_.reserve(max_explore_iterations_);
 
-  Node *start = new Node(start_, this);
+  node_pool_.emplace_back(start_, this);
+  Node *start = &node_pool_.back();
   start->g_cost = 0.0;
   start->h_cost = heuristic(start);
 
-  nodes_.reserve(50000);
-  nodes_.push_back(start);
-
-  const int num_theta_bins = static_cast<int>(360.0 / angular_resolution_);
-  const int state_space_size = height_ * width_ * num_theta_bins;
-
   std::priority_queue<Node *, std::vector<Node *>, CompareNode> open;
-  std::vector<double> g_costs(state_space_size,
-                              std::numeric_limits<double>::infinity());
-  open.push(start);
 
+  closed_.reset();
+  g_cost_table_.reset();
+
+  open.push(start);
   int count = 0;
   double accumulator = 0.0;
 
@@ -238,8 +207,9 @@ void HybridAStar::simulate() {
     open.pop();
 
     const int curr_idx = curr->getStateIndex();
-    if (curr->g_cost > g_costs[curr_idx])
+    if (closed_.get(curr_idx))
       continue;
+    closed_.set(curr_idx, true);
 
     if (goalReached(curr)) {
       while (curr) {
@@ -262,20 +232,14 @@ void HybridAStar::simulate() {
                      analytical_expansion.end());
         return;
       }
-
       accumulator = 0.0;
     }
 
     std::vector<std::pair<Pose3d, double>> neighbors = expand(curr);
-
     for (auto &[nbr_pose, move_penalty] : neighbors) {
       State3d next_state = poseToState(nbr_pose);
-
       if (!costmap_->isValid(next_state.x, next_state.y))
         continue;
-
-      const int next_state_idx = next_state.theta_bin * height_ * width_ +
-                                 next_state.y * width_ + next_state.x;
 
       const double raw_cost = costmap_->getCostAt(next_state.x, next_state.y);
       double normalized_cost = raw_cost / 252.0;
@@ -287,21 +251,26 @@ void HybridAStar::simulate() {
 
       const double new_g_cost = curr->g_cost + traversal_cost;
 
-      if (new_g_cost >= g_costs[next_state_idx])
+      const int next_state_idx = next_state.theta_bin * height_ * width_ +
+                                 next_state.y * width_ + next_state.x;
+
+      if (g_cost_table_.isSet(next_state_idx) &&
+          new_g_cost >= g_cost_table_.get(next_state_idx))
+        continue;
+      g_cost_table_.set(next_state_idx, new_g_cost);
+
+      if (closed_.get(next_state_idx))
         continue;
 
-      g_costs[next_state_idx] = new_g_cost;
-
-      Node *next = new Node(nbr_pose, this, curr);
+      node_pool_.emplace_back(nbr_pose, this, curr);
+      Node *next = &node_pool_.back();
       next->g_cost = new_g_cost;
       next->h_cost = heuristic(next);
-
       open.push(next);
-      nodes_.push_back(next);
     }
 
     accumulator += 1.0;
-    if (++count > 50000)
+    if (++count > max_explore_iterations_)
       break;
   }
 }
@@ -309,8 +278,8 @@ void HybridAStar::simulate() {
 std::vector<Pose2d> HybridAStar::analyticalExpansion(const Node *node) {
   motion_model_->simulate(node->pose, end_);
 
-  double mm_dist = motion_model_->getOptimalDistance();
-  if (mm_dist >= analytical_expansion_max_dist_)
+  const double mm_dist = motion_model_->getOptimalDistance();
+  if (mm_dist >= analytical_expansion_max_length_)
     return {};
 
   std::vector<Pose2d> mm_path = motion_model_->getOptimalPath();
@@ -320,25 +289,25 @@ std::vector<Pose2d> HybridAStar::analyticalExpansion(const Node *node) {
   for (size_t i = 1; i < mm_path.size(); ++i) {
     const Pose2d &p0 = mm_path[i - 1];
     const Pose2d &p1 = mm_path[i];
-    Pose2d d = p1 - p0;
+    const Pose2d d = p1 - p0;
 
     if (i == 1) {
-      State2d s0 = pose2dToState2d(p0);
+      const State2d s0 = pose2dToState2d(p0);
       if (!costmap_->isValid(s0.x, s0.y) ||
           costmap_->getCostAt(s0.x, s0.y) >= expansion_cost_)
         return {};
     }
 
     for (int j = 1; j <= num_samples_; ++j) {
-      double t = static_cast<double>(j) / (num_samples_ + 1);
-      Pose2d interp = p0 + d * t;
-      State2d s_interp = pose2dToState2d(interp);
+      const double t = static_cast<double>(j) / (num_samples_ + 1);
+      const Pose2d interp = p0 + d * t;
+      const State2d s_interp = pose2dToState2d(interp);
       if (!costmap_->isValid(s_interp.x, s_interp.y) ||
           costmap_->getCostAt(s_interp.x, s_interp.y) >= expansion_cost_)
         return {};
     }
 
-    State2d s1 = pose2dToState2d(p1);
+    const State2d s1 = pose2dToState2d(p1);
     if (!costmap_->isValid(s1.x, s1.y) ||
         costmap_->getCostAt(s1.x, s1.y) >= expansion_cost_)
       return {};
@@ -349,18 +318,18 @@ std::vector<Pose2d> HybridAStar::analyticalExpansion(const Node *node) {
 
 double HybridAStar::heuristic(const Node *node) {
   motion_model_->simulate(node->pose, end_);
-  double h_mm = motion_model_->getOptimalDistance();
-  double h_2d = utils::distance(node->pose, end_);
+  const double h_mm = motion_model_->getOptimalDistance();
+  const double h_2d = utils::distance(node->pose, end_);
 
-  double h1 = std::max(h_mm, h_2d);
-  double h2 = holonomic_with_obstacle_cost_[costmap_->getIndex(node->state.x,
-                                                               node->state.y)];
+  const double h1 = std::max(h_mm, h_2d);
+  const double h2 = holonomic_with_obstacle_cost_[costmap_->getIndex(
+      node->state.x, node->state.y)];
   return std::max(h1, h2);
 }
 
 bool HybridAStar::goalReached(const Node *node) {
-  double dtheta = std::atan2(std::sin(node->pose.theta - end_.theta),
-                             std::cos(node->pose.theta - end_.theta));
+  const double dtheta = std::atan2(std::sin(node->pose.theta - end_.theta),
+                                   std::cos(node->pose.theta - end_.theta));
   return (utils::distance(node->pose, end_) < distance_tolerance_ &&
           std::abs(dtheta) < angular_tolerance_);
 }
@@ -423,10 +392,6 @@ std::vector<std::pair<Pose3d, double>> HybridAStar::expand(const Node *node) {
   return neighbors;
 }
 
-void HybridAStar::freeNodes() {
-  for (Node *n : nodes_)
-    delete n;
-  nodes_.clear();
-}
+void HybridAStar::freeNodes() { node_pool_.clear(); }
 
 }; // namespace planner
