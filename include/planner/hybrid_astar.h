@@ -9,6 +9,7 @@
 #include "planner/pose.h"
 #include "planner/state.h"
 #include "utils/gen_vector.h"
+#include "utils/trig_utils.h"
 
 namespace planner {
 
@@ -18,10 +19,11 @@ public:
 
   void setParameters(const costmap::Costmap *costmap,
                      const Optimizer *optimizer, MotionModel *motion_mode_,
+                     const utils::TrigTable *trig_table,
                      const HybridAstarParams &params);
-
   void setStart(double x, double y, double theta);
   void setGoal(double x, double y, double theta);
+
   std::vector<Pose2d> getPlan();
 
 private:
@@ -95,6 +97,7 @@ private:
   static constexpr double theta_to_deg_ = 180.0 / M_PI;
 
   const costmap::Costmap *costmap_;
+  const utils::TrigTable *trig_table_;
   const Optimizer *optimizer_;
   MotionModel *motion_model_;
 
@@ -108,8 +111,6 @@ private:
 
   utils::GenVector<double> g_cost_table_;
   utils::GenVector<bool> closed_;
-
-  friend class Node;
 };
 
 }; // namespace planner

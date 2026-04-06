@@ -15,6 +15,10 @@ Dubins::Dubins() {
   distance_tolerance_ = 0.1;
 }
 
+void Dubins::setTrigTable(const utils::TrigTable *trig_table) {
+  trig_table_ = trig_table;
+}
+
 void Dubins::setDistanceResolution(double resolution) {
   distance_resolution_ = resolution;
 }
@@ -31,6 +35,7 @@ void Dubins::setMinTurningRadius(double min_radius) {
 void Dubins::simulate(const Pose3d &start, const Pose3d &end) {
   assert(min_turning_radius_ > 0);
   assert(distance_resolution_ > 0);
+  assert(trig_table_ != nullptr);
 
   assert(std::isfinite(start.x) && std::isfinite(start.y) &&
          std::isfinite(start.theta));
@@ -98,12 +103,14 @@ std::vector<Pose2d> Dubins::getOptimalPath() {
       double dtheta = ds * curvature;
 
       if (std::abs(curvature) < 1e-9) {
-        curr.x += ds * std::cos(curr.theta);
-        curr.y += ds * std::sin(curr.theta);
+        curr.x += ds * trig_table_->cos(curr.theta);
+        curr.y += ds * trig_table_->sin(curr.theta);
       } else {
         double R = 1.0 / curvature;
-        curr.x += R * (std::sin(curr.theta + dtheta) - std::sin(curr.theta));
-        curr.y -= R * (std::cos(curr.theta + dtheta) - std::cos(curr.theta));
+        curr.x += R * (trig_table_->sin(curr.theta + dtheta) -
+                       trig_table_->sin(curr.theta));
+        curr.y -= R * (trig_table_->cos(curr.theta + dtheta) -
+                       trig_table_->cos(curr.theta));
         curr.theta += dtheta;
       }
 
@@ -147,9 +154,9 @@ void Dubins::pathLSL(const Pose3d &p, bool reflect) {
   double alpha, beta, d;
   computeParams(p, alpha, beta, d);
 
-  double sa = sin(alpha), sb = sin(beta);
-  double ca = cos(alpha), cb = cos(beta);
-  double c_ab = cos(alpha - beta);
+  double sa = trig_table_->sin(alpha), sb = trig_table_->sin(beta);
+  double ca = trig_table_->cos(alpha), cb = trig_table_->cos(beta);
+  double c_ab = trig_table_->cos(alpha - beta);
 
   double tmp0 = d + sa - sb;
   double p_sq = 2 + d * d - 2 * c_ab + 2 * d * (sa - sb);
@@ -176,9 +183,9 @@ void Dubins::pathRSR(const Pose3d &p, bool reflect) {
   double alpha, beta, d;
   computeParams(p, alpha, beta, d);
 
-  double sa = sin(alpha), sb = sin(beta);
-  double ca = cos(alpha), cb = cos(beta);
-  double c_ab = cos(alpha - beta);
+  double sa = trig_table_->sin(alpha), sb = trig_table_->sin(beta);
+  double ca = trig_table_->cos(alpha), cb = trig_table_->cos(beta);
+  double c_ab = trig_table_->cos(alpha - beta);
 
   double tmp0 = d - sa + sb;
   double p_sq = 2 + d * d - 2 * c_ab + 2 * d * (sb - sa);
@@ -205,9 +212,9 @@ void Dubins::pathLSR(const Pose3d &p, bool reflect) {
   double alpha, beta, d;
   computeParams(p, alpha, beta, d);
 
-  double sa = sin(alpha), sb = sin(beta);
-  double ca = cos(alpha), cb = cos(beta);
-  double c_ab = cos(alpha - beta);
+  double sa = trig_table_->sin(alpha), sb = trig_table_->sin(beta);
+  double ca = trig_table_->cos(alpha), cb = trig_table_->cos(beta);
+  double c_ab = trig_table_->cos(alpha - beta);
 
   double p_sq = -2 + d * d + 2 * c_ab + 2 * d * (sa + sb);
   if (p_sq < 0)
@@ -233,9 +240,9 @@ void Dubins::pathRSL(const Pose3d &p, bool reflect) {
   double alpha, beta, d;
   computeParams(p, alpha, beta, d);
 
-  double sa = sin(alpha), sb = sin(beta);
-  double ca = cos(alpha), cb = cos(beta);
-  double c_ab = cos(alpha - beta);
+  double sa = trig_table_->sin(alpha), sb = trig_table_->sin(beta);
+  double ca = trig_table_->cos(alpha), cb = trig_table_->cos(beta);
+  double c_ab = trig_table_->cos(alpha - beta);
 
   double p_sq = -2 + d * d + 2 * c_ab - 2 * d * (sa + sb);
   if (p_sq < 0)
@@ -261,9 +268,9 @@ void Dubins::pathRLR(const Pose3d &p, bool reflect) {
   double alpha, beta, d;
   computeParams(p, alpha, beta, d);
 
-  double sa = sin(alpha), sb = sin(beta);
-  double ca = cos(alpha), cb = cos(beta);
-  double c_ab = cos(alpha - beta);
+  double sa = trig_table_->sin(alpha), sb = trig_table_->sin(beta);
+  double ca = trig_table_->cos(alpha), cb = trig_table_->cos(beta);
+  double c_ab = trig_table_->cos(alpha - beta);
 
   double tmp0 = (6 - d * d + 2 * c_ab + 2 * d * (sa - sb)) / 8.0;
 
@@ -291,9 +298,9 @@ void Dubins::pathLRL(const Pose3d &p, bool reflect) {
   double alpha, beta, d;
   computeParams(p, alpha, beta, d);
 
-  double sa = sin(alpha), sb = sin(beta);
-  double ca = cos(alpha), cb = cos(beta);
-  double c_ab = cos(alpha - beta);
+  double sa = trig_table_->sin(alpha), sb = trig_table_->sin(beta);
+  double ca = trig_table_->cos(alpha), cb = trig_table_->cos(beta);
+  double c_ab = trig_table_->cos(alpha - beta);
 
   double tmp0 = (6 - d * d + 2 * c_ab + 2 * d * (sb - sa)) / 8.0;
 

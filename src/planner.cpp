@@ -16,6 +16,7 @@
 #include "planner/hybrid_astar.h"
 #include "planner/motion_model.h"
 #include "planner/optimizer.h"
+#include "utils/trig_utils.h"
 
 using namespace std::placeholders;
 using namespace std::chrono_literals;
@@ -124,9 +125,10 @@ private:
     optimizer_.setIterations(1000);
     optimizer_.setWeights(0.3, 0.2);
 
+    motion_model_.setTrigTable(&trig_table_);
     motion_model_.setMotionModel(planner::MotionModelType::DUBINS);
     motion_model_.setDistanceResolution(costmap_.getResolution());
-    motion_model_.setMinTurningRadius(1.5 / 2);
+    motion_model_.setMinTurningRadius(2.0 / 2.0);
     motion_model_.setTolerance(0.5, 0.2);
 
     planner::HybridAstarParams params;
@@ -136,17 +138,18 @@ private:
     params.angular_tolerance = 0.2;
     params.angular_resolution = 5;
 
-    planner_.setParameters(&costmap_, &optimizer_, &motion_model_, params);
+    planner_.setParameters(&costmap_, &optimizer_, &motion_model_, &trig_table_,
+                           params);
     planner_.setStart(start_x, start_y, start_theta);
     planner_.setGoal(goal_x, goal_y, goal_theta);
 
     auto start = std::chrono::steady_clock::now();
 
-    motion_model_.simulate(planner::Pose3d(start_x, start_y, start_theta),
-                           planner::Pose3d(goal_x, goal_y, goal_theta));
-    std::vector<planner::Pose2d> path = motion_model_.getOptimalPath();
+    // motion_model_.simulate(planner::Pose3d(start_x, start_y, start_theta),
+    //                        planner::Pose3d(goal_x, goal_y, goal_theta));
+    // std::vector<planner::Pose2d> path = motion_model_.getOptimalPath();
 
-    // std::vector<planner::Pose2d> path = planner_.getPlan();
+    std::vector<planner::Pose2d> path = planner_.getPlan();
 
     auto end = std::chrono::steady_clock::now();
 
@@ -204,6 +207,7 @@ private:
   planner::HybridAStar planner_;
   planner::Optimizer optimizer_;
   planner::MotionModel motion_model_;
+  utils::TrigTable trig_table_ = utils::TrigTable(10000);
 
   bool have_start_ = false;
   bool have_goal_ = false;

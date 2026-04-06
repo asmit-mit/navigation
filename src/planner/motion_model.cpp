@@ -4,6 +4,11 @@ namespace planner {
 
 MotionModel::MotionModel() {}
 
+void MotionModel::setTrigTable(const utils::TrigTable *trig_table) {
+  dubins_.setTrigTable(trig_table);
+  reed_shepps_.setTrigTable(trig_table);
+}
+
 void MotionModel::setMotionModel(MotionModelType type) { type_ = type; }
 
 void MotionModel::setDistanceResolution(double resolution) {

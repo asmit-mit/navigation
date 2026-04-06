@@ -31,7 +31,8 @@ add_executable(planner
   src/planner/motion_model.cpp
   src/planner/optimizer.cpp
 
-  src/utils/math_utils.cpp)
+  src/utils/math_utils.cpp
+  src/utils/trig_utils.cpp)
 target_include_directories(planner PUBLIC
   $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
   $<INSTALL_INTERFACE:include>)

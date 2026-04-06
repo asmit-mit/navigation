@@ -15,6 +15,10 @@ ReedShepps::ReedShepps() {
   distance_tolerance_ = 0.1;
 }
 
+void ReedShepps::setTrigTable(const utils::TrigTable *trig_table) {
+  trig_table_ = trig_table;
+}
+
 void ReedShepps::setDistanceResolution(double resolution) {
   distance_resolution_ = resolution;
 }
@@ -31,6 +35,7 @@ void ReedShepps::setMinTurningRadius(double min_radius) {
 void ReedShepps::simulate(const Pose3d &start, const Pose3d &end) {
   assert(min_turning_radius_ > 0);
   assert(distance_resolution_ > 0);
+  assert(trig_table_ != nullptr);
 
   assert(std::isfinite(start.x) && std::isfinite(start.y) &&
          std::isfinite(start.theta));
@@ -94,12 +99,14 @@ std::vector<Pose2d> ReedShepps::getOptimalPath() {
       double dtheta = d * curvature;
 
       if (std::abs(curvature) < 1e-9) {
-        curr.x += d * std::cos(curr.theta);
-        curr.y += d * std::sin(curr.theta);
+        curr.x += d * trig_table_->cos(curr.theta);
+        curr.y += d * trig_table_->sin(curr.theta);
       } else {
         double R = 1.0 / curvature;
-        curr.x += R * (std::sin(curr.theta + dtheta) - std::sin(curr.theta));
-        curr.y -= R * (std::cos(curr.theta + dtheta) - std::cos(curr.theta));
+        curr.x += R * (trig_table_->sin(curr.theta + dtheta) -
+                       trig_table_->sin(curr.theta));
+        curr.y -= R * (trig_table_->cos(curr.theta + dtheta) -
+                       trig_table_->cos(curr.theta));
         curr.theta += dtheta;
       }
 
@@ -132,7 +139,8 @@ void ReedShepps::tryPath(double dist, int count, bool timeflip, bool reflect) {
 
 void ReedShepps::path1(const Pose3d &p, bool timeflip, bool reflect) {
   double phi = p.theta;
-  auto [u, t] = utils::R(p.x - std::sin(phi), p.y - 1 + std::cos(phi));
+  auto [u, t] =
+      utils::R(p.x - trig_table_->sin(phi), p.y - 1 + trig_table_->cos(phi));
   double v = utils::M(phi - t);
 
   double dist = std::abs(t) + std::abs(u) + std::abs(v);
@@ -146,7 +154,8 @@ void ReedShepps::path1(const Pose3d &p, bool timeflip, bool reflect) {
 
 void ReedShepps::path2(const Pose3d &p, bool timeflip, bool reflect) {
   double phi = utils::M(p.theta);
-  auto [rho, t1] = utils::R(p.x + std::sin(phi), p.y - 1 - std::cos(phi));
+  auto [rho, t1] =
+      utils::R(p.x + trig_table_->sin(phi), p.y - 1 - trig_table_->cos(phi));
 
   if (rho * rho < 4)
     return;
@@ -166,14 +175,14 @@ void ReedShepps::path2(const Pose3d &p, bool timeflip, bool reflect) {
 
 void ReedShepps::path3(const Pose3d &p, bool timeflip, bool reflect) {
   double phi = p.theta;
-  double x1 = p.x - std::sin(phi);
-  double eta = p.y - 1 + std::cos(phi);
+  double x1 = p.x - trig_table_->sin(phi);
+  double eta = p.y - 1 + trig_table_->cos(phi);
   auto [rho, theta] = utils::R(x1, eta);
 
   if (rho > 4)
     return;
 
-  double A = std::acos(std::clamp(rho / 4, -1.0, 1.0));
+  double A = acos(std::clamp(rho / 4, -1.0, 1.0));
   double t = utils::M(theta + M_PI_2 + A);
   double u = utils::M(M_PI - 2 * A);
   double v = utils::M(phi - t - u);
@@ -189,14 +198,14 @@ void ReedShepps::path3(const Pose3d &p, bool timeflip, bool reflect) {
 
 void ReedShepps::path4(const Pose3d &p, bool timeflip, bool reflect) {
   double phi = p.theta;
-  double x1 = p.x - std::sin(phi);
-  double eta = p.y - 1 + std::cos(phi);
+  double x1 = p.x - trig_table_->sin(phi);
+  double eta = p.y - 1 + trig_table_->cos(phi);
   auto [rho, theta] = utils::R(x1, eta);
 
   if (rho > 4)
     return;
 
-  double A = std::acos(std::clamp(rho / 4, -1.0, 1.0));
+  double A = acos(std::clamp(rho / 4, -1.0, 1.0));
   double t = utils::M(theta + M_PI_2 + A);
   double u = utils::M(M_PI - 2 * A);
   double v = utils::M(t + u - phi);
@@ -212,15 +221,15 @@ void ReedShepps::path4(const Pose3d &p, bool timeflip, bool reflect) {
 
 void ReedShepps::path5(const Pose3d &p, bool timeflip, bool reflect) {
   double phi = p.theta;
-  double x1 = p.x - std::sin(phi);
-  double eta = p.y - 1 + std::cos(phi);
+  double x1 = p.x - trig_table_->sin(phi);
+  double eta = p.y - 1 + trig_table_->cos(phi);
   auto [rho, theta] = utils::R(x1, eta);
 
   if (rho > 4)
     return;
 
-  double u = std::acos(std::clamp(1 - rho * rho / 8, -1.0, 1.0));
-  double A = std::asin(2 * std::sin(u) / rho);
+  double u = acos(std::clamp(1 - rho * rho / 8, -1.0, 1.0));
+  double A = asin(2 * trig_table_->sin(u) / rho);
   double t = utils::M(theta + M_PI_2 - A);
   double v = utils::M(t - u - phi);
 
@@ -235,8 +244,8 @@ void ReedShepps::path5(const Pose3d &p, bool timeflip, bool reflect) {
 
 void ReedShepps::path6(const Pose3d &p, bool timeflip, bool reflect) {
   double phi = p.theta;
-  double x1 = p.x + std::sin(phi);
-  double eta = p.y - 1 - std::cos(phi);
+  double x1 = p.x + trig_table_->sin(phi);
+  double eta = p.y - 1 - trig_table_->cos(phi);
   auto [rho, theta] = utils::R(x1, eta);
 
   if (rho > 4)
@@ -244,12 +253,12 @@ void ReedShepps::path6(const Pose3d &p, bool timeflip, bool reflect) {
 
   double A, t, u, v;
   if (rho <= 2) {
-    A = std::acos(std::clamp((rho + 2) / 4, -1.0, 1.0));
+    A = acos(std::clamp((rho + 2) / 4, -1.0, 1.0));
     t = utils::M(theta + M_PI_2 + A);
     u = utils::M(A);
     v = utils::M(phi - t + 2 * u);
   } else {
-    A = std::acos(std::clamp((rho - 2) / 4, -1.0, 1.0));
+    A = acos(std::clamp((rho - 2) / 4, -1.0, 1.0));
     t = utils::M(theta + M_PI_2 - A);
     u = utils::M(M_PI - A);
     v = utils::M(phi - t + 2 * u);
@@ -267,8 +276,8 @@ void ReedShepps::path6(const Pose3d &p, bool timeflip, bool reflect) {
 
 void ReedShepps::path7(const Pose3d &p, bool timeflip, bool reflect) {
   double phi = p.theta;
-  double xi = p.x + std::sin(phi);
-  double eta = p.y - 1 - std::cos(phi);
+  double xi = p.x + trig_table_->sin(phi);
+  double eta = p.y - 1 - trig_table_->cos(phi);
   auto [rho, theta] = utils::R(xi, eta);
   double u1 = (20 - rho * rho) / 16;
 
@@ -278,8 +287,8 @@ void ReedShepps::path7(const Pose3d &p, bool timeflip, bool reflect) {
   if (u1 < 0 || u1 > 1)
     return;
 
-  double u = std::acos(u1);
-  double A = std::asin(2 * std::sin(u) / rho);
+  double u = acos(u1);
+  double A = asin(2 * trig_table_->sin(u) / rho);
   double t = utils::M(theta + M_PI_2 + A);
   double v = utils::M(t - phi);
 
@@ -295,8 +304,8 @@ void ReedShepps::path7(const Pose3d &p, bool timeflip, bool reflect) {
 
 void ReedShepps::path8(const Pose3d &p, bool timeflip, bool reflect) {
   double phi = p.theta;
-  double xi = p.x - std::sin(phi);
-  double eta = p.y - 1 + std::cos(phi);
+  double xi = p.x - trig_table_->sin(phi);
+  double eta = p.y - 1 + trig_table_->cos(phi);
   auto [rho, theta] = utils::R(xi, eta);
 
   if (rho < 2)
@@ -319,8 +328,8 @@ void ReedShepps::path8(const Pose3d &p, bool timeflip, bool reflect) {
 
 void ReedShepps::path9(const Pose3d &p, bool timeflip, bool reflect) {
   double phi = p.theta;
-  double xi = p.x - std::sin(phi);
-  double eta = p.y - 1 + std::cos(phi);
+  double xi = p.x - trig_table_->sin(phi);
+  double eta = p.y - 1 + trig_table_->cos(phi);
   auto [rho, theta] = utils::R(xi, eta);
 
   if (rho < 2)
@@ -343,8 +352,8 @@ void ReedShepps::path9(const Pose3d &p, bool timeflip, bool reflect) {
 
 void ReedShepps::path10(const Pose3d &p, bool timeflip, bool reflect) {
   double phi = p.theta;
-  double xi = p.x + std::sin(phi);
-  double eta = p.y - 1 - std::cos(phi);
+  double xi = p.x + trig_table_->sin(phi);
+  double eta = p.y - 1 - trig_table_->cos(phi);
   auto [rho, theta] = utils::R(xi, eta);
 
   if (rho < 2)
@@ -366,8 +375,8 @@ void ReedShepps::path10(const Pose3d &p, bool timeflip, bool reflect) {
 
 void ReedShepps::path11(const Pose3d &p, bool timeflip, bool reflect) {
   double phi = p.theta;
-  double xi = p.x + std::sin(phi);
-  double eta = p.y - 1 - std::cos(phi);
+  double xi = p.x + trig_table_->sin(phi);
+  double eta = p.y - 1 - trig_table_->cos(phi);
 
   auto [rho, theta] = utils::R(xi, eta);
 
@@ -390,8 +399,8 @@ void ReedShepps::path11(const Pose3d &p, bool timeflip, bool reflect) {
 
 void ReedShepps::path12(const Pose3d &p, bool timeflip, bool reflect) {
   double phi = p.theta;
-  double xi = p.x + std::sin(phi);
-  double eta = p.y - 1 - std::cos(phi);
+  double xi = p.x + trig_table_->sin(phi);
+  double eta = p.y - 1 - trig_table_->cos(phi);
 
   auto [rho, theta] = utils::R(xi, eta);
 

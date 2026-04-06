@@ -34,10 +34,12 @@ HybridAStar::HybridAStar() {}
 void HybridAStar::setParameters(const costmap::Costmap *costmap,
                                 const Optimizer *optimizer,
                                 MotionModel *motion_model,
+                                const utils::TrigTable *trig_table,
                                 const HybridAstarParams &params) {
   costmap_ = costmap;
   optimizer_ = optimizer;
   motion_model_ = motion_model;
+  trig_table_ = trig_table;
 
   controls_count_ =
       (motion_model_->getType() == MotionModelType::REED_SHEPPS) ? 6 : 3;
@@ -350,8 +352,8 @@ std::vector<std::pair<Pose3d, double>> HybridAStar::expand(const Node *node) {
     const double dir = (u > 0) ? 1.0 : -1.0;
 
     for (int i = 0; i < num_samples_; ++i) {
-      temp.x += expand_ds_ * std::cos(temp.theta) * dir;
-      temp.y += expand_ds_ * std::sin(temp.theta) * dir;
+      temp.x += expand_ds_ * trig_table_->cos(temp.theta) * dir;
+      temp.y += expand_ds_ * trig_table_->sin(temp.theta) * dir;
 
       if (std::abs(omega) > epsilon_) {
         double dtheta = omega * (expand_ds_ / std::abs(u));

@@ -2,6 +2,7 @@
 
 #include "planner/dubins.h"
 #include "planner/reed_shepps.h"
+#include "utils/trig_utils.h"
 
 namespace planner {
 
@@ -14,6 +15,7 @@ class MotionModel {
 public:
   MotionModel();
 
+  void setTrigTable(const utils::TrigTable *trig_table);
   void setMotionModel(MotionModelType type);
   void setDistanceResolution(double resolution);
   void setTolerance(double angle, double distance);

@@ -6,6 +6,7 @@
 
 #include "planner/motion_states.h"
 #include "planner/pose.h"
+#include "utils/trig_utils.h"
 
 namespace planner {
 
@@ -13,6 +14,7 @@ class Dubins {
 public:
   Dubins();
 
+  void setTrigTable(const utils::TrigTable *trig_table);
   void setDistanceResolution(double resolution);
   void setTolerance(double angle, double distance);
   void setMinTurningRadius(double min_radius);
@@ -49,6 +51,8 @@ private:
   void computeParams(const Pose3d &p, double &alpha, double &beta, double &d);
 
 private:
+  const utils::TrigTable *trig_table_;
+
   double min_turning_radius_;
   double angular_tolerance_, distance_tolerance_;
   double distance_resolution_;

@@ -5,6 +5,7 @@
 
 #include "planner/motion_states.h"
 #include "planner/pose.h"
+#include "utils/trig_utils.h"
 
 namespace planner {
 
@@ -12,6 +13,7 @@ class ReedShepps {
 public:
   ReedShepps();
 
+  void setTrigTable(const utils::TrigTable *trig_table);
   void setDistanceResolution(double resolution);
   void setTolerance(double angle, double distance);
   void setMinTurningRadius(double min_radius);
@@ -71,6 +73,8 @@ private:
   void tryPath(double dist, int count, bool timeflip, bool reflect);
 
 private:
+  const utils::TrigTable *trig_table_;
+
   double min_turning_radius_;
   double angular_tolerance_, distance_tolerance_;
   double distance_resolution_;
