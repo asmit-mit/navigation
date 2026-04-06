@@ -7,7 +7,6 @@
 #include "geometry_msgs/msg/pose_stamped.hpp"
 #include "nav_msgs/msg/occupancy_grid.hpp"
 #include "nav_msgs/msg/path.hpp"
-#include "planner/pose.h"
 #include "rclcpp/rclcpp.hpp"
 
 #include "tf2/LinearMath/Matrix3x3.hpp"
@@ -121,6 +120,7 @@ private:
     RCLCPP_INFO(this->get_logger(), "Start: %f %f", start_x, start_y);
     RCLCPP_INFO(this->get_logger(), "Goal: %f %f", goal_x, goal_y);
 
+    optimizer_.setCostmap(&costmap_);
     optimizer_.setIterations(1000);
     optimizer_.setWeights(0.3, 0.2);
 
@@ -142,11 +142,11 @@ private:
 
     auto start = std::chrono::steady_clock::now();
 
-    // motion_model_.simulate(planner::Pose3d(start_x, start_y, start_theta),
-    //                        planner::Pose3d(goal_x, goal_y, goal_theta));
-    // std::vector<planner::Pose2d> path = motion_model_.getOptimalPath();
+    motion_model_.simulate(planner::Pose3d(start_x, start_y, start_theta),
+                           planner::Pose3d(goal_x, goal_y, goal_theta));
+    std::vector<planner::Pose2d> path = motion_model_.getOptimalPath();
 
-    std::vector<planner::Pose2d> path = planner_.getPlan();
+    // std::vector<planner::Pose2d> path = planner_.getPlan();
 
     auto end = std::chrono::steady_clock::now();
 

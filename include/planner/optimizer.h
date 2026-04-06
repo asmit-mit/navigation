@@ -1,5 +1,6 @@
 #pragma once
 
+#include "costmap/costmap.h"
 #include "planner/pose.h"
 
 #include <vector>
@@ -10,6 +11,7 @@ class Optimizer {
 public:
   Optimizer();
 
+  void setCostmap(const costmap::Costmap *costmap);
   void setWeights(double smooth, double data);
   void setIterations(int iterations);
 
@@ -18,6 +20,8 @@ public:
 private:
   int iterations_;
   double smooth_weight_, data_weight_;
+
+  const costmap::Costmap *costmap_;
 
   static constexpr double epsilon_ = 1e-6;
 };

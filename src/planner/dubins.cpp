@@ -92,10 +92,9 @@ std::vector<Pose2d> Dubins::getOptimalPath() {
       curvature = -1.0 / min_turning_radius_;
 
     double remaining = std::abs(segment.param) * min_turning_radius_;
-    double step = distance_resolution_;
 
     while (remaining > 1e-9) {
-      double ds = std::min(step, remaining);
+      double ds = std::min(distance_resolution_, remaining);
       double dtheta = ds * curvature;
 
       if (std::abs(curvature) < 1e-9) {
