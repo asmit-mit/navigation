@@ -7,6 +7,7 @@
 #include "geometry_msgs/msg/pose_stamped.hpp"
 #include "nav_msgs/msg/occupancy_grid.hpp"
 #include "nav_msgs/msg/path.hpp"
+#include "planner/pose.h"
 #include "rclcpp/rclcpp.hpp"
 
 #include "tf2/LinearMath/Matrix3x3.hpp"
@@ -124,7 +125,7 @@ private:
     optimizer_.setWeights(0.3, 0.2);
 
     motion_model_.setMotionModel(planner::MotionModelType::DUBINS);
-    motion_model_.setDistanceResolution(0.1);
+    motion_model_.setDistanceResolution(costmap_.getResolution());
     motion_model_.setMinTurningRadius(1.5 / 2);
     motion_model_.setTolerance(0.5, 0.2);
 
@@ -136,11 +137,14 @@ private:
     params.angular_resolution = 5;
 
     planner_.setParameters(&costmap_, &optimizer_, &motion_model_, params);
-
     planner_.setStart(start_x, start_y, start_theta);
     planner_.setGoal(goal_x, goal_y, goal_theta);
 
     auto start = std::chrono::steady_clock::now();
+
+    // motion_model_.simulate(planner::Pose3d(start_x, start_y, start_theta),
+    //                        planner::Pose3d(goal_x, goal_y, goal_theta));
+    // std::vector<planner::Pose2d> path = motion_model_.getOptimalPath();
 
     std::vector<planner::Pose2d> path = planner_.getPlan();
 

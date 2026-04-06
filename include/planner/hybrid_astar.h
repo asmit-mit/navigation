@@ -98,7 +98,7 @@ private:
   const Optimizer *optimizer_;
   MotionModel *motion_model_;
 
-  std::vector<double> holonomic_with_obstacle_cost_;
+  utils::GenVector<double> holonomic_with_obstacle_cost_;
 
   std::vector<Pose2d> plan_;
   std::vector<Node> node_pool_;

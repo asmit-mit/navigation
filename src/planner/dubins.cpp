@@ -140,8 +140,8 @@ void Dubins::computeParams(const Pose3d &p, double &alpha, double &beta,
   d = std::hypot(dx, dy);
   double theta = (d > 1e-9) ? std::atan2(dy, dx) : 0.0;
 
-  alpha = utils::mod2pi(-theta);
-  beta = utils::mod2pi(p.theta - theta);
+  alpha = utils::M2pi(-theta);
+  beta = utils::M2pi(p.theta - theta);
 }
 
 void Dubins::pathLSL(const Pose3d &p, bool reflect) {
@@ -160,9 +160,9 @@ void Dubins::pathLSL(const Pose3d &p, bool reflect) {
 
   double tmp1 = atan2(cb - ca, tmp0);
 
-  double t = utils::mod2pi(tmp1 - alpha);
+  double t = utils::M2pi(tmp1 - alpha);
   double u = sqrt(p_sq);
-  double v = utils::mod2pi(beta - tmp1);
+  double v = utils::M2pi(beta - tmp1);
 
   double dist = t + u + v;
 
@@ -189,9 +189,9 @@ void Dubins::pathRSR(const Pose3d &p, bool reflect) {
 
   double tmp1 = atan2(ca - cb, tmp0);
 
-  double t = utils::mod2pi(alpha - tmp1);
+  double t = utils::M2pi(alpha - tmp1);
   double u = sqrt(p_sq);
-  double v = utils::mod2pi(tmp1 - beta);
+  double v = utils::M2pi(tmp1 - beta);
 
   double dist = t + u + v;
 
@@ -218,8 +218,8 @@ void Dubins::pathLSR(const Pose3d &p, bool reflect) {
 
   double tmp0 = atan2(-ca - cb, d + sa + sb) - atan2(-2.0, u);
 
-  double t = utils::mod2pi(tmp0 - alpha);
-  double v = utils::mod2pi(tmp0 - beta);
+  double t = utils::M2pi(tmp0 - alpha);
+  double v = utils::M2pi(tmp0 - beta);
 
   double dist = t + u + v;
 
@@ -246,8 +246,8 @@ void Dubins::pathRSL(const Pose3d &p, bool reflect) {
 
   double tmp0 = atan2(ca + cb, d - sa - sb) - atan2(2.0, u);
 
-  double t = utils::mod2pi(alpha - tmp0);
-  double v = utils::mod2pi(beta - tmp0);
+  double t = utils::M2pi(alpha - tmp0);
+  double v = utils::M2pi(beta - tmp0);
 
   double dist = t + u + v;
 
@@ -271,13 +271,13 @@ void Dubins::pathRLR(const Pose3d &p, bool reflect) {
   if (std::abs(tmp0) > 1)
     return;
 
-  double p_val = utils::mod2pi(2 * M_PI - acos(tmp0));
+  double p_val = utils::M2pi(2 * M_PI - acos(tmp0));
 
   double phi = atan2(ca - cb, d - sa + sb);
 
-  double t = utils::mod2pi(alpha - phi + p_val / 2);
+  double t = utils::M2pi(alpha - phi + p_val / 2);
   double u = p_val;
-  double v = utils::mod2pi(alpha - beta - t + p_val);
+  double v = utils::M2pi(alpha - beta - t + p_val);
 
   double dist = t + u + v;
 
@@ -301,13 +301,13 @@ void Dubins::pathLRL(const Pose3d &p, bool reflect) {
   if (std::abs(tmp0) > 1)
     return;
 
-  double p_val = utils::mod2pi(2 * M_PI - acos(tmp0));
+  double p_val = utils::M2pi(2 * M_PI - acos(tmp0));
 
   double phi = atan2(ca - cb, d + sa - sb);
 
-  double t = utils::mod2pi(-alpha - phi + p_val / 2);
+  double t = utils::M2pi(-alpha - phi + p_val / 2);
   double u = p_val;
-  double v = utils::mod2pi(beta - alpha - t + p_val);
+  double v = utils::M2pi(beta - alpha - t + p_val);
 
   double dist = t + u + v;
 

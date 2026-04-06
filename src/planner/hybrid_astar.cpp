@@ -83,7 +83,10 @@ void HybridAStar::setParameters(const costmap::Costmap *costmap,
   num_theta_bins_ = static_cast<int>(360.0 / angular_resolution_);
   state_space_size_ = height_ * width_ * num_theta_bins_;
 
-  g_cost_table_.resize(state_space_size_, std::numeric_limits<double>::infinity());
+  holonomic_with_obstacle_cost_.resize(height_ * width_,
+                                       std::numeric_limits<double>::infinity());
+  g_cost_table_.resize(state_space_size_,
+                       std::numeric_limits<double>::infinity());
   closed_.resize(state_space_size_, false);
 }
 
@@ -94,8 +97,7 @@ void HybridAStar::setGoal(double x, double y, double theta) {
 
   end_ = new_goal;
 
-  if (loc_changed ||
-      (int)holonomic_with_obstacle_cost_.size() != height_ * width_)
+  if (loc_changed)
     buildObstacleCostTable();
 }
 
@@ -114,11 +116,9 @@ State3d HybridAStar::poseToState(const Pose3d &p) {
   auto [x, y] = costmap_->worldToMapDiscrete(p.x, p.y);
 
   double theta_deg = p.theta * theta_to_deg_;
-  theta_deg = std::fmod(theta_deg, 360.0);
-  if (theta_deg < 0.0)
-    theta_deg += 360.0;
-
+  theta_deg -= 360.0 * std::floor(theta_deg / 360.0);
   int theta_bin = static_cast<int>(std::floor(theta_deg / angular_resolution_));
+
   return State3d(x, y, theta_bin);
 }
 
@@ -131,9 +131,10 @@ Pose2d HybridAStar::state2dToPose2d(const State2d &s) {
 }
 
 void HybridAStar::buildObstacleCostTable() {
-  holonomic_with_obstacle_cost_.assign(height_ * width_,
-                                       std::numeric_limits<double>::infinity());
+  holonomic_with_obstacle_cost_.reset();
+
   auto [start_x, start_y] = costmap_->worldToMapDiscrete(end_.x, end_.y);
+
   if (!costmap_->isValid(start_x, start_y))
     return;
 
@@ -144,13 +145,13 @@ void HybridAStar::buildObstacleCostTable() {
       pq;
 
   pq.emplace(0, start_idx);
-  holonomic_with_obstacle_cost_[start_idx] = 0.0;
+  holonomic_with_obstacle_cost_.set(start_idx, 0.0);
 
   while (!pq.empty()) {
     auto [cost, idx] = pq.top();
     pq.pop();
 
-    if (cost > holonomic_with_obstacle_cost_[idx])
+    if (cost > holonomic_with_obstacle_cost_.get(idx))
       continue;
 
     int x = idx % width_;
@@ -175,8 +176,8 @@ void HybridAStar::buildObstacleCostTable() {
       double new_cost =
           cost + move_cost * (1.0 + cost_penalty_ * normalized_cost);
 
-      if (new_cost < holonomic_with_obstacle_cost_[new_idx]) {
-        holonomic_with_obstacle_cost_[new_idx] = new_cost;
+      if (new_cost < holonomic_with_obstacle_cost_.get(new_idx)) {
+        holonomic_with_obstacle_cost_.set(new_idx, new_cost);
         pq.emplace(new_cost, new_idx);
       }
     }
@@ -322,14 +323,13 @@ double HybridAStar::heuristic(const Node *node) {
   const double h_2d = utils::distance(node->pose, end_);
 
   const double h1 = std::max(h_mm, h_2d);
-  const double h2 = holonomic_with_obstacle_cost_[costmap_->getIndex(
-      node->state.x, node->state.y)];
+  const double h2 = holonomic_with_obstacle_cost_.get(
+      costmap_->getIndex(node->state.x, node->state.y));
   return std::max(h1, h2);
 }
 
 bool HybridAStar::goalReached(const Node *node) {
-  const double dtheta = std::atan2(std::sin(node->pose.theta - end_.theta),
-                                   std::cos(node->pose.theta - end_.theta));
+  const double dtheta = utils::M(node->pose.theta - end_.theta);
   return (utils::distance(node->pose, end_) < distance_tolerance_ &&
           std::abs(dtheta) < angular_tolerance_);
 }
@@ -339,10 +339,8 @@ std::vector<std::pair<Pose3d, double>> HybridAStar::expand(const Node *node) {
   neighbors.reserve(controls_count_);
 
   double parent_omega = 0.0;
-  if (node->parent) {
-    double dtheta = node->pose.theta - node->parent->pose.theta;
-    parent_omega = std::atan2(std::sin(dtheta), std::cos(dtheta));
-  }
+  if (node->parent)
+    parent_omega = utils::M(node->pose.theta - node->parent->pose.theta);
 
   for (int k = 0; k < controls_count_; k++) {
     auto [u, omega] = controls_[k];
@@ -358,7 +356,7 @@ std::vector<std::pair<Pose3d, double>> HybridAStar::expand(const Node *node) {
       if (std::abs(omega) > epsilon_) {
         double dtheta = omega * (expand_ds_ / std::abs(u));
         temp.theta += dtheta;
-        temp.theta = std::atan2(std::sin(temp.theta), std::cos(temp.theta));
+        temp.theta = utils::M(temp.theta);
       }
 
       auto [gx, gy] = costmap_->worldToMapDiscrete(temp.x, temp.y);

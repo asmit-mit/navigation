@@ -31,14 +31,8 @@ planner::Pose2d perp(const planner::Pose2d &a, const planner::Pose2d &b) {
 }
 
 double M(double theta) {
-  theta = std::fmod(theta, 2 * M_PI);
-
-  if (theta < 0)
-    theta += 2 * M_PI;
-
-  if (theta >= M_PI)
-    theta -= 2 * M_PI;
-
+  const double two_pi = 2 * M_PI;
+  theta = theta - two_pi * std::floor((theta + M_PI) / two_pi);
   return theta;
 }
 
@@ -61,11 +55,9 @@ planner::Pose3d changeOfBasis(const planner::Pose3d &p1,
   return planner::Pose3d(new_x, new_y, new_theta);
 }
 
-double mod2pi(double x) {
-  x = fmod(x, 2 * M_PI);
-  if (x < 0)
-    x += 2 * M_PI;
-  return x;
+double M2pi(double theta) {
+  const double two_pi = 2 * M_PI;
+  return theta - two_pi * std::floor(theta / two_pi);
 }
 
 double rad2deg(double rad) { return 180 * rad / M_PI; }
