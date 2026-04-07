@@ -12,6 +12,8 @@ bool State3d::operator==(const State3d &other) const {
   return x == other.x && y == other.y && theta_bin == other.theta_bin;
 }
 
+State2d::State2d(int x, int y) : x(x), y(y) {}
+
 State2d::State2d(const std::pair<int, int> &s) {
   x = s.first;
   y = s.second;

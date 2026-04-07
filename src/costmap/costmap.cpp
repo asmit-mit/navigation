@@ -18,6 +18,8 @@ void Costmap::setGrid(nav_msgs::msg::OccupancyGrid::SharedPtr grid) {
   height_ = grid->info.height;
   width_ = grid->info.width;
   resolution_ = grid->info.resolution;
+  origin_x_ = grid->info.origin.position.x;
+  origin_y_ = grid->info.origin.position.y;
 
   computeDT();
 }

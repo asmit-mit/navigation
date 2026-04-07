@@ -17,6 +17,7 @@ struct State3d {
 struct State2d {
   int x, y;
 
+  State2d(int x, int y);
   State2d(const std::pair<int, int> &s);
   State2d(const State3d &s);
 };

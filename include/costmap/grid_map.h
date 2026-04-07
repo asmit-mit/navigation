@@ -27,8 +27,9 @@ public:
 protected:
   double resolution_;
   int height_, width_;
+  double origin_x_, origin_y_;
 
   nav_msgs::msg::OccupancyGrid::SharedPtr grid_;
 };
 
-}; // namespace planner
+} // namespace costmap

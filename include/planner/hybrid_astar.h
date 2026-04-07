@@ -29,7 +29,7 @@ public:
 private:
   struct Node {
     Pose3d pose;
-    State3d state;
+    int state_idx;
 
     double g_cost, h_cost;
 
@@ -49,6 +49,7 @@ private:
   State2d pose2dToState2d(const Pose2d &p);
   Pose2d state2dToPose2d(const State2d &s);
   int getStateIndex(const State3d &state) const;
+  State2d stateIndexToState2d(int index) const;
 
   void buildObstacleCostTable();
   double heuristic(const Node *node);

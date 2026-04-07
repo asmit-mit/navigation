@@ -15,6 +15,8 @@ void GridMap::setGrid(nav_msgs::msg::OccupancyGrid::SharedPtr grid) {
   height_ = grid->info.height;
   width_ = grid->info.width;
   resolution_ = grid->info.resolution;
+  origin_x_ = grid->info.origin.position.x;
+  origin_y_ = grid->info.origin.position.y;
 }
 
 int GridMap::getDataAt(int idx) const { return grid_->data[idx]; }
@@ -34,22 +36,22 @@ bool GridMap::isValid(int x, int y) const {
 int GridMap::getIndex(int x, int y) const { return y * width_ + x; }
 
 std::pair<int, int> GridMap::worldToMapDiscrete(double x, double y) const {
-  int gx = floor((x - grid_->info.origin.position.x) / resolution_);
-  int gy = floor((y - grid_->info.origin.position.y) / resolution_);
+  int gx = floor((x - origin_x_) / resolution_);
+  int gy = floor((y - origin_y_) / resolution_);
   return {gx, gy};
 }
 
 std::pair<double, double> GridMap::worldToMapContinous(double x,
                                                        double y) const {
-  double gx = (x - grid_->info.origin.position.x) / resolution_;
-  double gy = (y - grid_->info.origin.position.y) / resolution_;
+  double gx = (x - origin_x_) / resolution_;
+  double gy = (y - origin_y_) / resolution_;
   return {gx, gy};
 }
 
 std::pair<double, double> GridMap::mapToWorld(double x, double y) const {
-  double wx = x * resolution_ + grid_->info.origin.position.x;
-  double wy = y * resolution_ + grid_->info.origin.position.y;
+  double wx = x * resolution_ + origin_x_;
+  double wy = y * resolution_ + origin_y_;
   return {wx, wy};
 }
 
-}; // namespace planner
+}; // namespace costmap

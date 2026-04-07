@@ -137,6 +137,17 @@ int HybridAStar::getStateIndex(const State3d &state) const {
   return state.theta_bin * height_ * width_ + state.y * width_ + state.x;
 }
 
+State2d HybridAStar::stateIndexToState2d(int index) const {
+  int area = height_ * width_;
+
+  int rem = index % area;
+
+  int x = rem % width_;
+  int y = rem / width_;
+
+  return State2d(x, y);
+}
+
 void HybridAStar::buildObstacleCostTable() {
   holonomic_with_obstacle_cost_.reset();
 
@@ -201,7 +212,7 @@ void HybridAStar::simulate() {
 
   Node *start = &node_pool_.get(start_idx);
   start->pose = start_;
-  start->state = poseToState(start_);
+  start->state_idx = start_idx;
   start->g_cost = 0.0;
   start->h_cost = heuristic(start);
 
@@ -215,7 +226,7 @@ void HybridAStar::simulate() {
     Node *curr = open.top();
     open.pop();
 
-    const int curr_idx = getStateIndex(curr->state);
+    const int curr_idx = curr->state_idx;
     if (closed_.getByValue(curr_idx))
       continue;
     closed_.set(curr_idx, true);
@@ -274,7 +285,7 @@ void HybridAStar::simulate() {
       Node *next = &node_pool_.get(next_state_idx);
 
       next->pose = nbr_pose;
-      next->state = poseToState(nbr_pose);
+      next->state_idx = next_state_idx;
       next->parent = curr;
 
       next->g_cost = next_g_cost;
@@ -335,9 +346,11 @@ double HybridAStar::heuristic(const Node *node) {
   const double h_mm = motion_model_->getOptimalDistance();
   const double h_2d = utils::distance(node->pose, end_);
 
+  const State2d state = stateIndexToState2d(node->state_idx);
+
   const double h1 = std::max(h_mm, h_2d);
-  const double h2 = holonomic_with_obstacle_cost_.get(
-      costmap_->getIndex(node->state.x, node->state.y));
+  const double h2 =
+      holonomic_with_obstacle_cost_.get(costmap_->getIndex(state.x, state.y));
   return std::max(h1, h2);
 }
 
