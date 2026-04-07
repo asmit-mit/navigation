@@ -39,8 +39,6 @@ private:
 
     Node(const Pose3d &p, HybridAStar *planner);
     Node(const Pose3d &p, HybridAStar *planner, Node *parent);
-
-    int getStateIndex() const;
   };
 
   struct CompareNode {
@@ -51,16 +49,15 @@ private:
   State3d poseToState(const Pose3d &p);
   State2d pose2dToState2d(const Pose2d &p);
   Pose2d state2dToPose2d(const State2d &s);
+  int getStateIndex(const State3d &state) const;
 
   void buildObstacleCostTable();
-  void buildThetaTable();
-
-  void simulate();
   double heuristic(const Node *node);
   bool goalReached(const Node *node);
   std::vector<Pose2d> analyticalExpansion(const Node *node);
   std::vector<std::pair<Pose3d, double>> expand(const Node *node);
 
+  void simulate();
   void freeNodes();
 
 private:

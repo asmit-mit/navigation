@@ -1,6 +1,7 @@
 #include "planner/hybrid_astar.h"
 #include "utils/math_utils.h"
 
+#include <cassert>
 #include <limits>
 #include <queue>
 
@@ -20,11 +21,6 @@ HybridAStar::Node::Node(const Pose3d &p, HybridAStar *planner, Node *parent)
   h_cost = 0;
 }
 
-int HybridAStar::Node::getStateIndex() const {
-  return state.theta_bin * planner->height_ * planner->width_ +
-         state.y * planner->width_ + state.x;
-}
-
 bool HybridAStar::CompareNode::operator()(Node *a, Node *b) {
   return (a->g_cost + a->h_cost) > (b->g_cost + b->h_cost);
 }
@@ -36,6 +32,11 @@ void HybridAStar::setParameters(const costmap::Costmap *costmap,
                                 MotionModel *motion_model,
                                 const utils::TrigTable *trig_table,
                                 const HybridAstarParams &params) {
+  assert(costmap != nullptr);
+  assert(optimizer != nullptr);
+  assert(motion_model != nullptr);
+  assert(trig_table != nullptr);
+
   costmap_ = costmap;
   optimizer_ = optimizer;
   motion_model_ = motion_model;
@@ -132,6 +133,10 @@ Pose2d HybridAStar::state2dToPose2d(const State2d &s) {
   return Pose2d(costmap_->mapToWorld(s.x, s.y));
 }
 
+int HybridAStar::getStateIndex(const State3d &state) const {
+  return state.theta_bin * height_ * width_ + state.y * width_ + state.x;
+}
+
 void HybridAStar::buildObstacleCostTable() {
   holonomic_with_obstacle_cost_.reset();
 
@@ -189,7 +194,7 @@ void HybridAStar::buildObstacleCostTable() {
 void HybridAStar::simulate() {
   plan_.clear();
   node_pool_.clear();
-  node_pool_.reserve(max_explore_iterations_);
+  node_pool_.reserve(1 + controls_count_ * max_explore_iterations_);
 
   node_pool_.emplace_back(start_, this);
   Node *start = &node_pool_.back();
@@ -209,7 +214,7 @@ void HybridAStar::simulate() {
     Node *curr = open.top();
     open.pop();
 
-    const int curr_idx = curr->getStateIndex();
+    const int curr_idx = getStateIndex(curr->state);
     if (closed_.get(curr_idx))
       continue;
     closed_.set(curr_idx, true);
@@ -254,8 +259,7 @@ void HybridAStar::simulate() {
 
       const double new_g_cost = curr->g_cost + traversal_cost;
 
-      const int next_state_idx = next_state.theta_bin * height_ * width_ +
-                                 next_state.y * width_ + next_state.x;
+      const int next_state_idx = getStateIndex(next_state);
 
       if (g_cost_table_.isSet(next_state_idx) &&
           new_g_cost >= g_cost_table_.get(next_state_idx))
