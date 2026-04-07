@@ -7,17 +7,19 @@
 
 namespace planner {
 
-HybridAStar::Node::Node(const Pose3d &p, HybridAStar *planner)
-    : pose(p), parent(nullptr), planner(planner) {
-  state = planner->poseToState(p);
-  g_cost = 0;
+HybridAStar::Node::Node() : parent(nullptr) {
+  g_cost = std::numeric_limits<double>::infinity();
   h_cost = 0;
 }
 
-HybridAStar::Node::Node(const Pose3d &p, HybridAStar *planner, Node *parent)
-    : pose(p), parent(parent), planner(planner) {
-  state = planner->poseToState(p);
-  g_cost = 0;
+HybridAStar::Node::Node(const Pose3d &p) : pose(p), parent(nullptr) {
+  g_cost = std::numeric_limits<double>::infinity();
+  h_cost = 0;
+}
+
+HybridAStar::Node::Node(const Pose3d &p, Node *parent)
+    : pose(p), parent(parent) {
+  g_cost = std::numeric_limits<double>::infinity();
   h_cost = 0;
 }
 
@@ -88,8 +90,7 @@ void HybridAStar::setParameters(const costmap::Costmap *costmap,
 
   holonomic_with_obstacle_cost_.resize(height_ * width_,
                                        std::numeric_limits<double>::infinity());
-  g_cost_table_.resize(state_space_size_,
-                       std::numeric_limits<double>::infinity());
+  node_pool_.resize(state_space_size_, Node());
   closed_.resize(state_space_size_, false);
 }
 
@@ -110,7 +111,6 @@ void HybridAStar::setStart(double x, double y, double theta) {
 
 std::vector<Pose2d> HybridAStar::getPlan() {
   simulate();
-  freeNodes();
   plan_ = optimizer_->getSmoothPath(plan_);
   return plan_;
 }
@@ -193,18 +193,19 @@ void HybridAStar::buildObstacleCostTable() {
 
 void HybridAStar::simulate() {
   plan_.clear();
-  node_pool_.clear();
-  node_pool_.reserve(1 + controls_count_ * max_explore_iterations_);
+  node_pool_.reset();
+  closed_.reset();
 
-  node_pool_.emplace_back(start_, this);
-  Node *start = &node_pool_.back();
+  State3d start_state = poseToState(start_);
+  int start_idx = getStateIndex(start_state);
+
+  Node *start = &node_pool_.get(start_idx);
+  start->pose = start_;
+  start->state = poseToState(start_);
   start->g_cost = 0.0;
   start->h_cost = heuristic(start);
 
   std::priority_queue<Node *, std::vector<Node *>, CompareNode> open;
-
-  closed_.reset();
-  g_cost_table_.reset();
 
   open.push(start);
   int count = 0;
@@ -215,7 +216,7 @@ void HybridAStar::simulate() {
     open.pop();
 
     const int curr_idx = getStateIndex(curr->state);
-    if (closed_.get(curr_idx))
+    if (closed_.getByValue(curr_idx))
       continue;
     closed_.set(curr_idx, true);
 
@@ -257,22 +258,28 @@ void HybridAStar::simulate() {
           move_penalty *
           (path_length_weight_ + cost_penalty_ * normalized_cost);
 
-      const double new_g_cost = curr->g_cost + traversal_cost;
+      const double next_g_cost = curr->g_cost + traversal_cost;
 
       const int next_state_idx = getStateIndex(next_state);
 
-      if (g_cost_table_.isSet(next_state_idx) &&
-          new_g_cost >= g_cost_table_.get(next_state_idx))
-        continue;
-      g_cost_table_.set(next_state_idx, new_g_cost);
-
-      if (closed_.get(next_state_idx))
+      if (node_pool_.isSet(next_state_idx) &&
+          next_g_cost >= node_pool_.get(next_state_idx).g_cost)
         continue;
 
-      node_pool_.emplace_back(nbr_pose, this, curr);
-      Node *next = &node_pool_.back();
-      next->g_cost = new_g_cost;
+      node_pool_.get(next_state_idx).g_cost = next_g_cost;
+
+      if (closed_.getByValue(next_state_idx))
+        continue;
+
+      Node *next = &node_pool_.get(next_state_idx);
+
+      next->pose = nbr_pose;
+      next->state = poseToState(nbr_pose);
+      next->parent = curr;
+
+      next->g_cost = next_g_cost;
       next->h_cost = heuristic(next);
+
       open.push(next);
     }
 
@@ -395,7 +402,5 @@ std::vector<std::pair<Pose3d, double>> HybridAStar::expand(const Node *node) {
 
   return neighbors;
 }
-
-void HybridAStar::freeNodes() { node_pool_.clear(); }
 
 }; // namespace planner

@@ -33,8 +33,20 @@ public:
     gens_[idx] = gen_;
   }
 
-  T get(int idx) const {
+  T getByValue(int idx) const {
     return (gens_[idx] == gen_) ? data_[idx] : default_value_;
+  }
+
+  const T &get(int idx) const {
+    return (gens_[idx] == gen_) ? data_[idx] : default_value_;
+  }
+
+  T &get(int idx) {
+    if (gens_[idx] != gen_) {
+      data_[idx] = default_value_;
+      gens_[idx] = gen_;
+    }
+    return data_[idx];
   }
 
   bool isSet(int idx) const { return gens_[idx] == gen_; }

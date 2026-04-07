@@ -14,10 +14,6 @@ double distance(const planner::Pose2d &a, const planner::Pose2d &b) {
   return std::hypot(dx, dy);
 }
 
-double dot(const planner::Pose2d &a, const planner::Pose2d &b) {
-  return a.x * b.x + a.y * b.y;
-}
-
 planner::Pose2d perp(const planner::Pose2d &a, const planner::Pose2d &b) {
   double mod_b2 = b.norm2();
 
@@ -59,9 +55,5 @@ double M2pi(double theta) {
   const double two_pi = 2 * M_PI;
   return theta - two_pi * std::floor(theta / two_pi);
 }
-
-double rad2deg(double rad) { return 180 * rad / M_PI; }
-
-double deg2rad(double deg) { return M_PI * deg / 180; }
 
 }; // namespace utils

@@ -27,18 +27,17 @@ public:
   std::vector<Pose2d> getPlan();
 
 private:
-  class Node {
-  public:
+  struct Node {
     Pose3d pose;
     State3d state;
 
     double g_cost, h_cost;
 
     Node *parent;
-    HybridAStar *planner;
 
-    Node(const Pose3d &p, HybridAStar *planner);
-    Node(const Pose3d &p, HybridAStar *planner, Node *parent);
+    Node();
+    Node(const Pose3d &p);
+    Node(const Pose3d &p, Node *parent);
   };
 
   struct CompareNode {
@@ -58,7 +57,6 @@ private:
   std::vector<std::pair<Pose3d, double>> expand(const Node *node);
 
   void simulate();
-  void freeNodes();
 
 private:
   int height_, width_;
@@ -101,12 +99,11 @@ private:
   utils::GenVector<double> holonomic_with_obstacle_cost_;
 
   std::vector<Pose2d> plan_;
-  std::vector<Node> node_pool_;
 
   std::array<std::pair<double, double>, 6> controls_;
   int controls_count_;
 
-  utils::GenVector<double> g_cost_table_;
+  utils::GenVector<Node> node_pool_;
   utils::GenVector<bool> closed_;
 };
 
