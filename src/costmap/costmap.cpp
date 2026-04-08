@@ -29,7 +29,7 @@ void Costmap::setParameters(double radius, double scaling_factor) {
   assert(scaling_factor > epsilon_);
 
   inflation_radius_ = radius;
-  inscribed_radius_ = 0.4;
+  inscribed_radius_ = 0.1;
 
   scaling_factor_ = scaling_factor;
 
@@ -51,8 +51,10 @@ void Costmap::computeCostmap() {
 
     int idx = static_cast<int>(dist * COST_PRECISION + 0.5);
 
-    if (idx >= static_cast<int>(dist_to_cost_.size()))
-      idx = dist_to_cost_.size() - 1;
+    if (idx >= static_cast<int>(dist_to_cost_.size())) {
+      costmap_[i] = 0.0;
+      continue;
+    }
 
     costmap_[i] = dist_to_cost_[idx];
   }

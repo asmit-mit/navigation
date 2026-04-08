@@ -19,6 +19,11 @@ public:
   double getCostAt(int idx) const;
   double getCostAt(int x, int y) const;
 
+public:
+  static constexpr int COST_PRECISION = 100;
+  static constexpr double LETHAL_COST = 254.0;
+  static constexpr double INSCRIBED_COST = 253.0;
+
 private:
   void computeDT1D(int start, int size, int stride);
   void computeDT();
@@ -31,10 +36,6 @@ private:
 
   static constexpr double INF = std::numeric_limits<double>::infinity();
   static constexpr double epsilon_ = 1e-6;
-
-  static constexpr int COST_PRECISION = 100;
-  static constexpr double LETHAL_COST = 254.0;
-  static constexpr double INSCRIBED_COST = 253.0;
 
   std::vector<double> dist_to_cost_;
   std::vector<double> costmap_;

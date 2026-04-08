@@ -44,7 +44,8 @@ std::vector<Pose2d> Optimizer::getSmoothPath(std::vector<Pose2d> &plan) const {
       double new_y = y_i_y + data_weight_ * (x_i_y - y_i_y) +
                      smooth_weight_ * (y_next_y + y_prev_y - 2.0 * y_i_y);
 
-      if (costmap_->getCostAt(new_x, new_y) >= 252.0)
+      if (costmap_->getCostAt(new_x, new_y) >=
+          (costmap::Costmap::INSCRIBED_COST - 1))
         continue;
 
       change += std::fabs(new_x - new_path[i].x);

@@ -2,6 +2,7 @@
 #include <functional>
 #include <iostream>
 #include <memory>
+#include <unordered_set>
 #include <vector>
 
 #include "geometry_msgs/msg/pose_stamped.hpp"
@@ -55,7 +56,7 @@ private:
     latest_map_ = msg;
 
     costmap_.setGrid(latest_map_);
-    costmap_.setParameters(1.4, 2.0);
+    costmap_.setParameters(0.55, 3.0);
     costmap_.computeCostmap();
 
     int size = costmap_.getHeight() * costmap_.getWidth();
@@ -128,15 +129,19 @@ private:
     motion_model_.setTrigTable(&trig_table_);
     motion_model_.setMotionModel(planner::MotionModelType::DUBINS);
     motion_model_.setDistanceResolution(costmap_.getResolution());
-    motion_model_.setMinTurningRadius(2.0 / 2.0);
+    motion_model_.setMinTurningRadius(0.22 / 1.0);
     motion_model_.setTolerance(0.5, 0.2);
 
     planner::HybridAstarParams params;
-    params.max_linear_velocity = 2.0;
-    params.max_angular_velocity = 2.0;
+    params.max_linear_velocity = 0.22;
+    params.max_angular_velocity = 1.0;
     params.distance_tolerance = 0.5;
     params.angular_tolerance = 0.2;
     params.angular_resolution = 5;
+    params.reverse_penalty = 2.1;
+    params.steering_penalty = 0.7;
+    params.change_steering_penalty = 0.2;
+    params.cost_penalty = 6.0;
 
     planner_.setParameters(&costmap_, &optimizer_, &motion_model_, &trig_table_,
                            params);
