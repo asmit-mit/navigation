@@ -190,7 +190,6 @@ void HybridAStar::buildObstacleCostTable() {
       const double raw_cost = costmap_->getCostAt(new_x, new_y);
       double normalized_cost =
           raw_cost / (costmap::Costmap::INSCRIBED_COST - 1);
-      normalized_cost = normalized_cost * normalized_cost;
 
       double new_cost =
           cost + move_cost * (1.0 + cost_penalty_ * normalized_cost);
@@ -265,7 +264,6 @@ void HybridAStar::simulate() {
       const double raw_cost = costmap_->getCostAt(next_state.x, next_state.y);
       double normalized_cost =
           raw_cost / (costmap::Costmap::INSCRIBED_COST - 1);
-      normalized_cost = normalized_cost * normalized_cost;
 
       const double traversal_cost =
           move_penalty *
