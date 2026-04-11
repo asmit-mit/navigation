@@ -19,9 +19,8 @@ find_package(tf2_geometry_msgs REQUIRED)
 add_executable(navigation 
   src/navigation.cpp 
 
-  src/costmap/DSU.cpp 
-  src/costmap/costmap.cpp 
-  src/costmap/grid_map.cpp
+  src/grid/costmap.cpp 
+  src/grid/grid.cpp
 
   src/planner/pose.cpp
   src/planner/state.cpp
@@ -31,6 +30,8 @@ add_executable(navigation
   src/planner/motion_model.cpp
   src/planner/optimizer.cpp
 
+  src/utils/DSU.cpp
+  src/utils/EDT.cpp
   src/utils/math_utils.cpp
   src/utils/trig_utils.cpp)
 target_include_directories(navigation PUBLIC

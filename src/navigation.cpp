@@ -13,7 +13,7 @@
 #include "tf2/LinearMath/Matrix3x3.hpp"
 #include "tf2_geometry_msgs/tf2_geometry_msgs.hpp"
 
-#include "costmap/costmap.h"
+#include "grid/costmap.h"
 #include "planner/hybrid_astar.h"
 #include "planner/motion_model.h"
 #include "planner/optimizer.h"
@@ -208,7 +208,7 @@ private:
   geometry_msgs::msg::PoseStamped start_pose_;
   geometry_msgs::msg::PoseStamped goal_pose_;
 
-  costmap::Costmap costmap_;
+  grid::Costmap costmap_;
   planner::HybridAStar planner_;
   planner::Optimizer optimizer_;
   planner::MotionModel motion_model_;

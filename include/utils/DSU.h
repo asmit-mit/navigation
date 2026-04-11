@@ -2,7 +2,7 @@
 
 #include <vector>
 
-namespace voronoi {
+namespace utils {
 
 class DSU {
 private:
@@ -17,4 +17,4 @@ public:
   bool unite(int a, int b);
 };
 
-} // namespace voronoi
+} // namespace utils

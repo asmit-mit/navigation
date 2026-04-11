@@ -29,7 +29,7 @@ bool HybridAStar::CompareNode::operator()(Node *a, Node *b) {
 
 HybridAStar::HybridAStar() {}
 
-void HybridAStar::setParameters(const costmap::Costmap *costmap,
+void HybridAStar::setParameters(const grid::Costmap *costmap,
                                 const Optimizer *optimizer,
                                 MotionModel *motion_model,
                                 const utils::TrigTable *trig_table,
@@ -120,7 +120,8 @@ State3d HybridAStar::poseToState(const Pose3d &p) {
 
   double theta_deg = p.theta * theta_to_deg_;
   theta_deg -= 360.0 * std::floor(theta_deg / 360.0);
-  int theta_bin = static_cast<int>(std::floor(theta_deg / angular_resolution_));
+  const int theta_bin =
+      static_cast<int>(std::floor(theta_deg / angular_resolution_));
 
   return State3d(x, y, theta_bin);
 }
@@ -151,12 +152,12 @@ State2d HybridAStar::stateIndexToState2d(int index) const {
 void HybridAStar::buildObstacleCostTable() {
   holonomic_with_obstacle_cost_.reset();
 
-  auto [start_x, start_y] = costmap_->worldToMapDiscrete(end_.x, end_.y);
+  const auto [start_x, start_y] = costmap_->worldToMapDiscrete(end_.x, end_.y);
 
   if (!costmap_->isValid(start_x, start_y))
     return;
 
-  int start_idx = costmap_->getIndex(start_x, start_y);
+  const int start_idx = costmap_->getIndex(start_x, start_y);
 
   std::priority_queue<std::pair<double, int>,
                       std::vector<std::pair<double, int>>, std::greater<>>
@@ -166,14 +167,14 @@ void HybridAStar::buildObstacleCostTable() {
   holonomic_with_obstacle_cost_.set(start_idx, 0.0);
 
   while (!pq.empty()) {
-    auto [cost, idx] = pq.top();
+    const auto [cost, idx] = pq.top();
     pq.pop();
 
     if (cost > holonomic_with_obstacle_cost_.get(idx))
       continue;
 
-    int x = idx % width_;
-    int y = idx / width_;
+    const int x = idx % width_;
+    const int y = idx / width_;
 
     for (int i = 0; i < 8; i++) {
       int new_x = x + dx_[i];
@@ -182,17 +183,16 @@ void HybridAStar::buildObstacleCostTable() {
       if (!costmap_->isValid(new_x, new_y))
         continue;
 
-      int new_idx = costmap_->getIndex(new_x, new_y);
-      double move_cost = (dx_[i] == 0 || dy_[i] == 0)
-                             ? map_resolution_
-                             : map_resolution_ * 1.41421356;
+      const int new_idx = costmap_->getIndex(new_x, new_y);
+      const double move_cost = (dx_[i] == 0 || dy_[i] == 0)
+                                   ? map_resolution_
+                                   : map_resolution_ * 1.41421356;
 
-      const double raw_cost = costmap_->getCostAt(new_x, new_y);
-      double normalized_cost =
-          raw_cost / (costmap::Costmap::INSCRIBED_COST - 1);
+      const double costmap_cost = costmap_->getCostAt(new_x, new_y) /
+                                  (grid::Costmap::INSCRIBED_COST - 1);
 
-      double new_cost =
-          cost + move_cost * (1.0 + cost_penalty_ * normalized_cost);
+      const double new_cost =
+          cost + move_cost * (1.0 + cost_penalty_ * costmap_cost);
 
       if (new_cost < holonomic_with_obstacle_cost_.get(new_idx)) {
         holonomic_with_obstacle_cost_.set(new_idx, new_cost);
@@ -208,7 +208,7 @@ void HybridAStar::simulate() {
   closed_.reset();
 
   State3d start_state = poseToState(start_);
-  int start_idx = getStateIndex(start_state);
+  const int start_idx = getStateIndex(start_state);
 
   Node *start = &node_pool_.get(start_idx);
   start->pose = start_;
@@ -261,13 +261,12 @@ void HybridAStar::simulate() {
       if (!costmap_->isValid(next_state.x, next_state.y))
         continue;
 
-      const double raw_cost = costmap_->getCostAt(next_state.x, next_state.y);
-      double normalized_cost =
-          raw_cost / (costmap::Costmap::INSCRIBED_COST - 1);
+      const double costmap_cost =
+          costmap_->getCostAt(next_state.x, next_state.y) /
+          (grid::Costmap::INSCRIBED_COST - 1);
 
       const double traversal_cost =
-          move_penalty *
-          (path_length_weight_ + cost_penalty_ * normalized_cost);
+          move_penalty * (path_length_weight_ + cost_penalty_ * costmap_cost);
 
       const double next_g_cost = curr->g_cost + traversal_cost;
 

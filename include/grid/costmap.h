@@ -1,13 +1,12 @@
 #pragma once
 
-#include "costmap/grid_map.h"
+#include "grid/grid.h"
 
-#include <limits>
 #include <vector>
 
-namespace costmap {
+namespace grid {
 
-class Costmap : public GridMap {
+class Costmap : public Grid {
 public:
   Costmap();
 
@@ -25,8 +24,6 @@ public:
   static constexpr double INSCRIBED_COST = 253.0;
 
 private:
-  void computeDT1D(int start, int size, int stride);
-  void computeDT();
   double computeCost(double dist);
   void computeDistToCostMap();
 
@@ -34,11 +31,10 @@ private:
   double inflation_radius_, inscribed_radius_;
   double scaling_factor_;
 
-  static constexpr double INF = std::numeric_limits<double>::infinity();
   static constexpr double epsilon_ = 1e-6;
 
   std::vector<double> dist_to_cost_;
   std::vector<double> costmap_;
 };
 
-} // namespace costmap
+} // namespace grid

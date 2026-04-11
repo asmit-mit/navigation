@@ -1,6 +1,6 @@
-#include "costmap/DSU.h"
+#include "utils/DSU.h"
 
-namespace voronoi {
+namespace utils {
 
 void DSU::init(int n) {
   parent.resize(n);
@@ -40,4 +40,4 @@ bool DSU::unite(int a, int b) {
   return true;
 }
 
-} // namespace voronoi
+} // namespace utils

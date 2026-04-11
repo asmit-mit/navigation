@@ -7,7 +7,7 @@ namespace planner {
 Optimizer::Optimizer()
     : iterations_(10), smooth_weight_(0.1), data_weight_(0.5) {}
 
-void Optimizer::setCostmap(const costmap::Costmap *costmap) {
+void Optimizer::setCostmap(const grid::Costmap *costmap) {
   costmap_ = costmap;
 }
 
@@ -45,7 +45,7 @@ std::vector<Pose2d> Optimizer::getSmoothPath(std::vector<Pose2d> &plan) const {
                      smooth_weight_ * (y_next_y + y_prev_y - 2.0 * y_i_y);
 
       if (costmap_->getCostAt(new_x, new_y) >=
-          (costmap::Costmap::INSCRIBED_COST - 1))
+          (grid::Costmap::INSCRIBED_COST - 1))
         continue;
 
       change += std::fabs(new_x - new_path[i].x);

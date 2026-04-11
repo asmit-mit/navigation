@@ -1,11 +1,11 @@
-#include "costmap/costmap.h"
+#include "grid/costmap.h"
+#include "utils/EDT.h"
 
 #include <assert.h>
 #include <cmath>
-#include <limits>
 #include <vector>
 
-namespace costmap {
+namespace grid {
 
 Costmap::Costmap() {
   inflation_radius_ = 0.2;
@@ -21,7 +21,9 @@ void Costmap::setGrid(nav_msgs::msg::OccupancyGrid::SharedPtr grid) {
   origin_x_ = grid->info.origin.position.x;
   origin_y_ = grid->info.origin.position.y;
 
-  computeDT();
+  costmap_.resize(height_ * width_);
+
+  utils::EDT::computeDT(grid_->data, costmap_, height_, width_);
 }
 
 void Costmap::setParameters(double radius, double scaling_factor) {
@@ -83,66 +85,4 @@ void Costmap::computeDistToCostMap() {
   }
 }
 
-void Costmap::computeDT() {
-  int size = height_ * width_;
-  costmap_.resize(size);
-
-  for (int i = 0; i < size; i++)
-    costmap_[i] = (getDataAt(i) == 100) ? 0 : INF;
-
-  for (int y = 0; y < height_; y++)
-    computeDT1D(y * width_, width_, 1);
-
-  for (int x = 0; x < width_; x++)
-    computeDT1D(x, height_, width_);
-}
-
-void Costmap::computeDT1D(int start, int size, int stride) {
-  std::vector<int> v(size);
-  std::vector<double> z(size + 1);
-
-  int k = 0;
-  v[0] = 0;
-  z[0] = -INF;
-  z[1] = INF;
-
-  auto f = [&](int q) -> double { return costmap_[start + q * stride]; };
-
-  for (int q = 1; q < size; q++) {
-    double s;
-
-    while (true) {
-      int vk = v[k];
-
-      s = ((f(q) + q * q) - (f(vk) + vk * vk)) / (2.0 * (q - vk));
-
-      if (s > z[k])
-        break;
-
-      k--;
-      if (k < 0) {
-        k = 0;
-        break;
-      }
-    }
-
-    k++;
-    v[k] = q;
-    z[k] = s;
-    z[k + 1] = std::numeric_limits<double>::infinity();
-  }
-
-  k = 0;
-  for (int q = 0; q < size; q++) {
-    while (z[k + 1] < q) {
-      k++;
-    }
-
-    int vk = v[k];
-    double dx = q - vk;
-
-    costmap_[start + q * stride] = dx * dx + f(vk);
-  }
-}
-
-} // namespace costmap
+} // namespace grid

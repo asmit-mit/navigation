@@ -2,12 +2,12 @@
 
 #include "nav_msgs/msg/occupancy_grid.hpp"
 
-namespace costmap {
+namespace grid {
 
-class GridMap {
+class Grid {
 public:
-  GridMap();
-  virtual ~GridMap() = default;
+  Grid();
+  virtual ~Grid() = default;
 
   virtual void setGrid(nav_msgs::msg::OccupancyGrid::SharedPtr grid);
 
@@ -32,4 +32,4 @@ protected:
   nav_msgs::msg::OccupancyGrid::SharedPtr grid_;
 };
 
-} // namespace costmap
+} // namespace grid
