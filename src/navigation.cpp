@@ -24,9 +24,9 @@ using namespace std::chrono_literals;
 using std::cout;
 using std::endl;
 
-class Planner : public rclcpp::Node {
+class Navigation : public rclcpp::Node {
 public:
-  Planner() : Node("planner") {
+  Navigation() : Node("navigation") {
     costmap_msg_ = nav_msgs::msg::OccupancyGrid();
 
     rclcpp::QoS map_qos(rclcpp::KeepLast(1));
@@ -34,10 +34,10 @@ public:
     map_qos.reliable();
 
     map_sub_ = this->create_subscription<nav_msgs::msg::OccupancyGrid>(
-        "/map", map_qos, std::bind(&Planner::mapCallback, this, _1));
+        "/map", map_qos, std::bind(&Navigation::mapCallback, this, _1));
 
     goal_sub_ = this->create_subscription<geometry_msgs::msg::PoseStamped>(
-        "/goal_pose", 10, std::bind(&Planner::goalCallback, this, _1));
+        "/goal_pose", 10, std::bind(&Navigation::goalCallback, this, _1));
 
     path_pub_ =
         this->create_publisher<nav_msgs::msg::Path>("/hybrid_astar_path", 10);
@@ -46,9 +46,9 @@ public:
         this->create_publisher<nav_msgs::msg::OccupancyGrid>("/costmap", 10);
 
     timer_ = this->create_wall_timer(500ms,
-                                     std::bind(&Planner::timerCallback, this));
+                                     std::bind(&Navigation::timerCallback, this));
 
-    RCLCPP_INFO(this->get_logger(), "Planner node started");
+    RCLCPP_INFO(this->get_logger(), "navigation node started");
   }
 
 private:
@@ -220,7 +220,7 @@ private:
 
 int main(int argc, char *argv[]) {
   rclcpp::init(argc, argv);
-  rclcpp::spin(std::make_shared<Planner>());
+  rclcpp::spin(std::make_shared<Navigation>());
   rclcpp::shutdown();
   return 0;
 }
