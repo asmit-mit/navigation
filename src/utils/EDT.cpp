@@ -1,25 +1,34 @@
 #include "utils/EDT.h"
 
+#include <cmath>
+
 namespace utils {
 
 EDT::EDT() {}
 
-void EDT::computeDT(const std::vector<int8_t> &grid, std::vector<double> &edt,
-                    int height, int width) {
-  int size = grid.size();
+void EDT::computeDT(nav_msgs::msg::OccupancyGrid::SharedPtr grid) {
+  const int size = grid->data.size();
+  const int height = grid->info.height;
+  const int width = grid->info.width;
+
+  distance_transform_.resize(size);
 
   for (int i = 0; i < size; i++)
-    edt[i] = (grid[i] == 100) ? 0 : INF;
+    distance_transform_[i] = (grid->data[i] == 100) ? 0 : INF;
 
   for (int y = 0; y < height; y++)
-    computeDT1D(edt, y * width, width, 1);
+    computeDT1D(y * width, width, 1);
 
   for (int x = 0; x < width; x++)
-    computeDT1D(edt, x, height, width);
+    computeDT1D(x, height, width);
+
+  for (int i = 0; i < size; i++)
+    distance_transform_[i] = std::sqrt(distance_transform_[i]);
 }
 
-void EDT::computeDT1D(std::vector<double> &edt, int start, int size,
-                      int stride) {
+double EDT::getDistanceAt(int idx) const { return distance_transform_[idx]; }
+
+void EDT::computeDT1D(int start, int size, int stride) {
   std::vector<int> v(size);
   std::vector<double> z(size + 1);
 
@@ -28,7 +37,9 @@ void EDT::computeDT1D(std::vector<double> &edt, int start, int size,
   z[0] = -INF;
   z[1] = INF;
 
-  auto f = [&](int q) -> double { return edt[start + q * stride]; };
+  auto f = [&](int q) -> double {
+    return distance_transform_[start + q * stride];
+  };
 
   for (int q = 1; q < size; q++) {
     double s;
@@ -63,7 +74,7 @@ void EDT::computeDT1D(std::vector<double> &edt, int start, int size,
     int vk = v[k];
     double dx = q - vk;
 
-    edt[start + q * stride] = dx * dx + f(vk);
+    distance_transform_[start + q * stride] = dx * dx + f(vk);
   }
 }
 

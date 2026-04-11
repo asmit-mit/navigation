@@ -1,4 +1,4 @@
-#include "grid/costmap.h"
+#include "grid/global_costmap.h"
 #include "utils/EDT.h"
 
 #include <assert.h>
@@ -7,13 +7,20 @@
 
 namespace grid {
 
-Costmap::Costmap() {
+GlobalCostmap::GlobalCostmap() {
   inflation_radius_ = 0.2;
   inscribed_radius_ = 0.1;
   scaling_factor_ = 5.0;
 };
 
-void Costmap::setGrid(nav_msgs::msg::OccupancyGrid::SharedPtr grid) {
+void GlobalCostmap::setParameters(nav_msgs::msg::OccupancyGrid::SharedPtr grid,
+                                  const utils::EDT *edt, double radius,
+                                  double scaling_factor) {
+  assert(radius > epsilon_);
+  assert(scaling_factor > epsilon_);
+  assert(downsample_factor >= 1);
+
+  edt_ = edt;
   grid_ = grid;
   height_ = grid->info.height;
   width_ = grid->info.width;
@@ -23,33 +30,26 @@ void Costmap::setGrid(nav_msgs::msg::OccupancyGrid::SharedPtr grid) {
 
   costmap_.resize(height_ * width_);
 
-  utils::EDT::computeDT(grid_->data, costmap_, height_, width_);
-}
-
-void Costmap::setParameters(double radius, double scaling_factor) {
-  assert(radius > epsilon_);
-  assert(scaling_factor > epsilon_);
-
   inflation_radius_ = radius;
   inscribed_radius_ = 0.1;
 
   scaling_factor_ = scaling_factor;
 
   computeDistToCostMap();
+  computeCostmap();
 }
 
-double Costmap::getCostAt(int idx) const { return costmap_[idx]; }
+double GlobalCostmap::getCostAt(int idx) const { return costmap_[idx]; }
 
-double Costmap::getCostAt(int x, int y) const {
+double GlobalCostmap::getCostAt(int x, int y) const {
   return costmap_[getIndex(x, y)];
 }
 
-void Costmap::computeCostmap() {
+void GlobalCostmap::computeCostmap() {
   int size = height_ * width_;
 
   for (int i = 0; i < size; i++) {
-    double dist_sq = costmap_[i];
-    double dist = std::sqrt(dist_sq);
+    double dist = edt_->getDistanceAt(i);
 
     int idx = static_cast<int>(dist * COST_PRECISION + 0.5);
 
@@ -62,7 +62,7 @@ void Costmap::computeCostmap() {
   }
 }
 
-double Costmap::computeCost(double dist) {
+double GlobalCostmap::computeCost(double dist) {
   if (dist <= epsilon_) {
     return LETHAL_COST;
   } else if (dist * resolution_ <= inscribed_radius_) {
@@ -74,7 +74,7 @@ double Costmap::computeCost(double dist) {
   }
 }
 
-void Costmap::computeDistToCostMap() {
+void GlobalCostmap::computeDistToCostMap() {
   const int max_grid_dist_scaled_ =
       (inflation_radius_ / resolution_) * COST_PRECISION + 1;
   dist_to_cost_.resize(max_grid_dist_scaled_ + 1);

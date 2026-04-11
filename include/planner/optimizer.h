@@ -1,6 +1,6 @@
 #pragma once
 
-#include "grid/costmap.h"
+#include "grid/global_costmap.h"
 #include "planner/pose.h"
 
 #include <vector>
@@ -11,7 +11,7 @@ class Optimizer {
 public:
   Optimizer();
 
-  void setCostmap(const grid::Costmap *costmap);
+  void setCostmap(const grid::GlobalCostmap *costmap);
   void setWeights(double smooth, double data);
   void setIterations(int iterations);
 
@@ -21,7 +21,7 @@ private:
   int iterations_;
   double smooth_weight_, data_weight_;
 
-  const grid::Costmap *costmap_;
+  const grid::GlobalCostmap *costmap_;
 
   static constexpr double epsilon_ = 1e-6;
 };

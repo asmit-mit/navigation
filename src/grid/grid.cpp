@@ -25,6 +25,8 @@ int Grid::getDataAt(int x, int y) const { return grid_->data[getIndex(x, y)]; }
 int Grid::getHeight() const { return height_; }
 int Grid::getWidth() const { return width_; }
 double Grid::getResolution() const { return resolution_; }
+double Grid::getOriginX() const { return origin_x_; }
+double Grid::getOriginY() const { return origin_y_; }
 
 bool Grid::isValid(int x, int y) const {
   return x >= 0 && y >= 0 && x < width_ && y < height_ &&

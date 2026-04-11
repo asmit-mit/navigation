@@ -16,6 +16,8 @@ public:
   int getHeight() const;
   int getWidth() const;
   double getResolution() const;
+  double getOriginX() const;
+  double getOriginY() const;
 
   bool isValid(int x, int y) const;
   int getIndex(int x, int y) const;

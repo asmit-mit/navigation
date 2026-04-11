@@ -2,7 +2,7 @@
 #include <cmath>
 #include <vector>
 
-#include "grid/costmap.h"
+#include "grid/global_costmap.h"
 #include "planner/motion_model.h"
 #include "planner/optimizer.h"
 #include "planner/parameters.h"
@@ -17,7 +17,7 @@ class HybridAStar {
 public:
   HybridAStar();
 
-  void setParameters(const grid::Costmap *costmap,
+  void setParameters(const grid::GlobalCostmap *costmap,
                      const Optimizer *optimizer, MotionModel *motion_mode_,
                      const utils::TrigTable *trig_table,
                      const HybridAstarParams &params);
@@ -92,7 +92,7 @@ private:
   static constexpr double epsilon_ = 1e-6;
   static constexpr double theta_to_deg_ = 180.0 / M_PI;
 
-  const grid::Costmap *costmap_;
+  const grid::GlobalCostmap *costmap_;
   const utils::TrigTable *trig_table_;
   const Optimizer *optimizer_;
   MotionModel *motion_model_;

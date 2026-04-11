@@ -1,7 +1,7 @@
 #pragma once
 
-#include <cstdint>
 #include <limits>
+#include <nav_msgs/msg/detail/occupancy_grid__struct.hpp>
 #include <vector>
 
 namespace utils {
@@ -10,15 +10,17 @@ class EDT {
 public:
   EDT();
 
-  static void computeDT(const std::vector<int8_t> &grid,
-                        std::vector<double> &edt, int height, int width);
+  void computeDT(nav_msgs::msg::OccupancyGrid::SharedPtr grid);
+
+  double getDistanceAt(int idx) const;
 
 private:
-  static void computeDT1D(std::vector<double> &edt, int start, int size,
-                          int stride);
+  void computeDT1D(int start, int size, int stride);
 
 private:
   static constexpr double INF = std::numeric_limits<double>::infinity();
+
+  std::vector<double> distance_transform_;
 };
 
 } // namespace utils

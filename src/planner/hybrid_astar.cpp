@@ -29,7 +29,7 @@ bool HybridAStar::CompareNode::operator()(Node *a, Node *b) {
 
 HybridAStar::HybridAStar() {}
 
-void HybridAStar::setParameters(const grid::Costmap *costmap,
+void HybridAStar::setParameters(const grid::GlobalCostmap *costmap,
                                 const Optimizer *optimizer,
                                 MotionModel *motion_model,
                                 const utils::TrigTable *trig_table,
@@ -189,7 +189,7 @@ void HybridAStar::buildObstacleCostTable() {
                                    : map_resolution_ * 1.41421356;
 
       const double costmap_cost = costmap_->getCostAt(new_x, new_y) /
-                                  (grid::Costmap::INSCRIBED_COST - 1);
+                                  (grid::GlobalCostmap::INSCRIBED_COST - 1);
 
       const double new_cost =
           cost + move_cost * (1.0 + cost_penalty_ * costmap_cost);
@@ -263,7 +263,7 @@ void HybridAStar::simulate() {
 
       const double costmap_cost =
           costmap_->getCostAt(next_state.x, next_state.y) /
-          (grid::Costmap::INSCRIBED_COST - 1);
+          (grid::GlobalCostmap::INSCRIBED_COST - 1);
 
       const double traversal_cost =
           move_penalty * (path_length_weight_ + cost_penalty_ * costmap_cost);

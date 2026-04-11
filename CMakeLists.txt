@@ -19,7 +19,8 @@ find_package(tf2_geometry_msgs REQUIRED)
 add_executable(navigation 
   src/navigation.cpp 
 
-  src/grid/costmap.cpp 
+  src/grid/global_costmap.cpp 
+  src/grid/local_costmap.cpp 
   src/grid/grid.cpp
 
   src/planner/pose.cpp
