@@ -24,6 +24,10 @@ public:
   double getCostAt(int local_x, int local_y) const;
   double getCostAtWorld(double world_x, double world_y) const;
 
+  double getDistanceAt(int idx) const;
+  double getDistanceAt(int local_x, int local_y) const;
+  double getDistanceAtWorld(double world_x, double world_y) const;
+
 public:
   static constexpr int COST_PRECISION = 100;
   static constexpr double LETHAL_COST = 254.0;

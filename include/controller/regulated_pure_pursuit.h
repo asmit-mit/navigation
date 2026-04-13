@@ -1,3 +1,5 @@
+#pragma once
+
 #include <vector>
 
 #include "controller/parameters.h"
@@ -5,7 +7,7 @@
 #include "grid/local_costmap.h"
 #include "utils/trig_utils.h"
 
-namespace contoller {
+namespace controller {
 
 class RegulatedPurePursuit {
 public:
@@ -16,25 +18,45 @@ public:
                      controller::ControllerParams &params);
 
   std::pair<double, double>
-  computeCommand(const geometry::Pose2d &current_pose,
+  computeCommand(const geometry::Pose3d &curr_pose, double linear_velocity,
                  const std::vector<geometry::Pose2d> &plan);
 
 private:
-  geometry::Pose2d findLookaheadPoint();
-  geometry::Pose2d transformToLocalFrame();
-  double computeCurvature();
-
-  std::pair<double, double> computeVelocity();
+  geometry::Pose2d findLookaheadPoint(const geometry::Pose3d &curr_pose,
+                                      const std::vector<geometry::Pose2d> &plan,
+                                      double lookahead_dist);
+  double computeCurvature(const geometry::Pose3d &curr_pose,
+                          const geometry::Pose2d &lookahead_point);
 
   double regulateByCurvature(double v, double curvature);
-  double regulateByCostmap(const geometry::Pose2d &, double v);
+  double regulateByCostmap(const geometry::Pose3d &curr_pose, double v);
 
-  bool isGoalReached();
-  double computeLookaheadDistance(double speed);
+  bool goalReached(const geometry::Pose3d &curr_pose,
+                   const geometry::Pose2d &end) const;
+  double computeLookaheadDistance(double linear_velocity);
+
+private:
+  double max_linear_velocity_;
+  double max_angular_velocity_;
+
+  double lookahead_distance_;
+  double lookahead_gain_;
+  double max_lookahead_distance_;
+  double min_lookahead_distance_;
+
+  double proximity_distance_;
+  double proximity_heurisitc_scale_;
+
+  double distance_tolerance_;
+
+  double min_turning_radius_;
+  double T_k_;
+    
+
+  static constexpr double epsilon_ = 1e-6;
 
   const grid::LocalCostmap *costmap_;
   const utils::TrigTable *trig_table_;
-  controller::ControllerParams params_;
 };
 
 } // namespace contoller

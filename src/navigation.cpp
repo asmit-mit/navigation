@@ -5,13 +5,17 @@
 #include <vector>
 
 #include "geometry_msgs/msg/pose_stamped.hpp"
+#include "geometry_msgs/msg/twist.hpp"
 #include "nav_msgs/msg/occupancy_grid.hpp"
+#include "nav_msgs/msg/odometry.hpp"
 #include "nav_msgs/msg/path.hpp"
 #include "rclcpp/rclcpp.hpp"
 
 #include "tf2/LinearMath/Matrix3x3.hpp"
 #include "tf2_geometry_msgs/tf2_geometry_msgs.hpp"
 
+#include "controller/parameters.h"
+#include "controller/regulated_pure_pursuit.h"
 #include "grid/global_costmap.h"
 #include "grid/local_costmap.h"
 #include "planner/hybrid_astar.h"
@@ -40,6 +44,12 @@ public:
     goal_sub_ = this->create_subscription<geometry_msgs::msg::PoseStamped>(
         "/goal_pose", 10, std::bind(&Navigation::goalCallback, this, _1));
 
+    odom_sub_ = this->create_subscription<nav_msgs::msg::Odometry>(
+        "/odom", 10, std::bind(&Navigation::odomCallback, this, _1));
+
+    cmd_vel_pub_ =
+        this->create_publisher<geometry_msgs::msg::Twist>("/cmd_vel", 10);
+
     path_pub_ =
         this->create_publisher<nav_msgs::msg::Path>("/hybrid_astar_path", 10);
 
@@ -63,25 +73,38 @@ private:
     latest_map_ = msg;
   }
 
+  void odomCallback(const nav_msgs::msg::Odometry::SharedPtr msg) {
+    start_pose_.pose = msg->pose.pose;
+    linear_velocity_ = msg->twist.twist.linear.x;
+
+    have_start_ = true;
+    // RCLCPP_INFO(this->get_logger(), "Updated start pose");
+  }
+
   void goalCallback(const geometry_msgs::msg::PoseStamped::SharedPtr msg) {
-    if (!have_start_) {
-      start_pose_ = *msg;
-      have_start_ = true;
-      RCLCPP_INFO(this->get_logger(), "Start pose received");
-      return;
-    }
+    // if (!have_start_) {
+    //   start_pose_ = *msg;
+    //   have_start_ = true;
+    //   RCLCPP_INFO(this->get_logger(), "Start pose received");
+    //   return;
+    // }
 
-    if (!have_goal_) {
-      goal_pose_ = *msg;
-      have_goal_ = true;
-      RCLCPP_INFO(this->get_logger(), "Goal pose received");
-      return;
-    }
+    // if (!have_goal_) {
+    //   goal_pose_ = *msg;
+    //   have_goal_ = true;
+    //   RCLCPP_INFO(this->get_logger(), "Goal pose received");
+    //   return;
+    // }
 
-    start_pose_ = goal_pose_;
-    goal_pose_ = *msg;
+    // start_pose_ = goal_pose_;
+    // goal_pose_ = *msg;
 
-    RCLCPP_INFO(this->get_logger(), "Updated start and goal");
+    // RCLCPP_INFO(this->get_logger(), "Updated start and goal");
+
+    goal_pose_.pose = msg->pose;
+
+    have_goal_ = true;
+    // RCLCPP_INFO(this->get_logger(), "Updated goal pose");
   }
 
   void costmapCallback() {
@@ -108,7 +131,7 @@ private:
       }
     }
 
-    RCLCPP_INFO(this->get_logger(), "Publishing Global Costmap");
+    // RCLCPP_INFO(this->get_logger(), "Publishing Global Costmap");
     global_costmap_pub_->publish(global_costmap_msg_);
 
     if (!have_start_)
@@ -139,7 +162,7 @@ private:
           static_cast<int8_t>(std::min(100.0, c / 2.55));
     }
 
-    RCLCPP_INFO(this->get_logger(), "Publishing Local Costmap");
+    // RCLCPP_INFO(this->get_logger(), "Publishing Local Costmap");
     local_costmap_pub_->publish(local_costmap_msg_);
   }
 
@@ -176,21 +199,28 @@ private:
     motion_model_.setMinTurningRadius(0.22 / 1.0);
     motion_model_.setTolerance(0.5, 0.2);
 
-    planner::HybridAstarParams params;
-    params.max_linear_velocity = 0.22;
-    params.max_angular_velocity = 1.0;
-    params.distance_tolerance = 0.5;
-    params.angular_tolerance = 0.2;
-    params.angular_resolution = 5;
-    params.reverse_penalty = 2.1;
-    params.steering_penalty = 0.7;
-    params.change_steering_penalty = 0.2;
-    params.cost_penalty = 6.0;
+    planner::HybridAstarParams planner_params;
+    planner_params.max_linear_velocity = 0.22;
+    planner_params.max_angular_velocity = 1.0;
+    planner_params.distance_tolerance = 0.5;
+    planner_params.angular_tolerance = 0.2;
+    planner_params.angular_resolution = 5;
+    planner_params.reverse_penalty = 2.1;
+    planner_params.steering_penalty = 0.7;
+    planner_params.change_steering_penalty = 0.2;
+    planner_params.cost_penalty = 6.0;
 
     planner_.setParameters(&global_costmap_, &optimizer_, &motion_model_,
-                           &trig_table_, params);
+                           &trig_table_, planner_params);
     planner_.setStart(start_x, start_y, start_theta);
     planner_.setGoal(goal_x, goal_y, goal_theta);
+
+    controller::ControllerParams controller_params;
+    controller_params.max_linear_velocity = 0.22;
+    controller_params.max_angular_velocity = 1.0;
+    controller_params.distance_tolerance = 0.5;
+
+    controller_.setParameters(&local_costmap_, &trig_table_, controller_params);
 
     auto start = std::chrono::steady_clock::now();
 
@@ -201,16 +231,27 @@ private:
     double time_ms =
         std::chrono::duration<double, std::milli>(end - start).count();
 
-    std::cout << "Planning time: " << time_ms << " ms\n";
+    RCLCPP_INFO(get_logger(), "Planning time: %f ms", time_ms);
 
     if (path.empty()) {
       RCLCPP_WARN(this->get_logger(), "No path found");
       return;
     }
 
+    auto [v, w] = controller_.computeCommand(
+        geometry::Pose3d(start_x, start_y, start_theta), linear_velocity_,
+        path);
+    RCLCPP_INFO(get_logger(), "Publishing v: %f and w: %f", v, w);
+
+    geometry_msgs::msg::Twist cmd;
+    cmd.linear.x = v;
+    cmd.angular.z = w;
+
+    cmd_vel_pub_->publish(cmd);
+
     nav_msgs::msg::Path ros_path;
     ros_path.header.stamp = this->now();
-    ros_path.header.frame_id = "map";
+    ros_path.header.frame_id = latest_map_->header.frame_id;
 
     for (const auto &pose : path) {
       geometry_msgs::msg::PoseStamped pose_stamped;
@@ -238,12 +279,14 @@ private:
   rclcpp::TimerBase::SharedPtr costmap_timer_;
 
   rclcpp::Subscription<nav_msgs::msg::OccupancyGrid>::SharedPtr map_sub_;
+  rclcpp::Subscription<nav_msgs::msg::Odometry>::SharedPtr odom_sub_;
   rclcpp::Subscription<geometry_msgs::msg::PoseStamped>::SharedPtr goal_sub_;
 
   rclcpp::Publisher<nav_msgs::msg::Path>::SharedPtr path_pub_;
   rclcpp::Publisher<nav_msgs::msg::OccupancyGrid>::SharedPtr
       global_costmap_pub_;
   rclcpp::Publisher<nav_msgs::msg::OccupancyGrid>::SharedPtr local_costmap_pub_;
+  rclcpp::Publisher<geometry_msgs::msg::Twist>::SharedPtr cmd_vel_pub_;
 
   nav_msgs::msg::OccupancyGrid::SharedPtr latest_map_;
   nav_msgs::msg::OccupancyGrid global_costmap_msg_;
@@ -259,9 +302,12 @@ private:
   planner::HybridAStar planner_;
   planner::Optimizer optimizer_;
   planner::MotionModel motion_model_;
+  controller::RegulatedPurePursuit controller_;
 
   bool have_start_ = false;
   bool have_goal_ = false;
+
+  double linear_velocity_;
 };
 
 int main(int argc, char *argv[]) {

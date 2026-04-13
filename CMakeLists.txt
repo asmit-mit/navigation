@@ -32,6 +32,8 @@ add_executable(navigation
   src/planner/motion_model.cpp
   src/planner/optimizer.cpp
 
+  src/controller/regulated_pure_pursuit.cpp
+
   src/utils/DSU.cpp
   src/utils/EDT.cpp
   src/utils/math_utils.cpp

@@ -87,6 +87,25 @@ double LocalCostmap::getCostAtWorld(double world_x, double world_y) const {
   return getCostAt(local_x, local_y);
 }
 
+double LocalCostmap::getDistanceAt(int idx) const {
+  return edt_->getDistanceAt(idx);
+}
+
+double LocalCostmap::getDistanceAt(int local_x, int local_y) const {
+  return edt_->getDistanceAt(localIndex(local_x, local_y));
+}
+
+double LocalCostmap::getDistanceAtWorld(double world_x, double world_y) const {
+  auto [local_x, local_y] = worldToMapDiscrete(world_x, world_y);
+
+  if (local_x < 0 || local_x >= window_width_ || local_y < 0 ||
+      local_y >= window_height_) {
+    return -1.0;
+  }
+
+  return getDistanceAt(local_x, local_y);
+}
+
 double LocalCostmap::getWindowWidth() const { return window_width_; }
 double LocalCostmap::getWindowHeight() const { return window_height_; }
 double LocalCostmap::getWindowOriginX() const { return window_origin_x_; }
