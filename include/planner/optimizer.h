@@ -1,7 +1,7 @@
 #pragma once
 
 #include "grid/global_costmap.h"
-#include "planner/pose.h"
+#include "geometry/pose.h"
 
 #include <vector>
 
@@ -15,7 +15,7 @@ public:
   void setWeights(double smooth, double data);
   void setIterations(int iterations);
 
-  std::vector<Pose2d> getSmoothPath(std::vector<Pose2d> &plan) const;
+  std::vector<geometry::Pose2d> getSmoothPath(std::vector<geometry::Pose2d> &plan) const;
 
 private:
   int iterations_;

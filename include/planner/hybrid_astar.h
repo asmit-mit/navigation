@@ -2,12 +2,12 @@
 #include <cmath>
 #include <vector>
 
+#include "geometry/pose.h"
+#include "geometry/state.h"
 #include "grid/global_costmap.h"
 #include "planner/motion_model.h"
 #include "planner/optimizer.h"
 #include "planner/parameters.h"
-#include "planner/pose.h"
-#include "planner/state.h"
 #include "utils/gen_vector.h"
 #include "utils/trig_utils.h"
 
@@ -24,11 +24,11 @@ public:
   void setStart(double x, double y, double theta);
   void setGoal(double x, double y, double theta);
 
-  std::vector<Pose2d> getPlan();
+  std::vector<geometry::Pose2d> getPlan();
 
 private:
   struct Node {
-    Pose3d pose;
+    geometry::Pose3d pose;
     int state_idx;
 
     double g_cost, h_cost;
@@ -36,8 +36,8 @@ private:
     Node *parent;
 
     Node();
-    Node(const Pose3d &p);
-    Node(const Pose3d &p, Node *parent);
+    Node(const geometry::Pose3d &p);
+    Node(const geometry::Pose3d &p, Node *parent);
   };
 
   struct CompareNode {
@@ -45,17 +45,17 @@ private:
   };
 
 private:
-  State3d poseToState(const Pose3d &p);
-  State2d pose2dToState2d(const Pose2d &p);
-  Pose2d state2dToPose2d(const State2d &s);
-  int getStateIndex(const State3d &state) const;
-  State2d stateIndexToState2d(int index) const;
+  geometry::State3d poseToState(const geometry::Pose3d &p);
+  geometry::State2d pose2dToState2d(const geometry::Pose2d &p);
+  geometry::Pose2d state2dToPose2d(const geometry::State2d &s);
+  int getStateIndex(const geometry::State3d &state) const;
+  geometry::State2d stateIndexToState2d(int index) const;
 
   void buildObstacleCostTable();
   double heuristic(const Node *node);
   bool goalReached(const Node *node);
-  std::vector<Pose2d> analyticalExpansion(const Node *node);
-  std::vector<std::pair<Pose3d, double>> expand(const Node *node);
+  std::vector<geometry::Pose2d> analyticalExpansion(const Node *node);
+  std::vector<std::pair<geometry::Pose3d, double>> expand(const Node *node);
 
   void simulate();
 
@@ -83,7 +83,7 @@ private:
   int num_theta_bins_;
   int state_space_size_;
 
-  Pose3d start_, end_;
+  geometry::Pose3d start_, end_;
 
   static constexpr int dx_[8] = {-1, 1, -1, 0, 1, -1, 0, 1};
   static constexpr int dy_[8] = {0, 0, 1, 1, 1, -1, -1, -1};
@@ -99,7 +99,7 @@ private:
 
   utils::GenVector<double> holonomic_with_obstacle_cost_;
 
-  std::vector<Pose2d> plan_;
+  std::vector<geometry::Pose2d> plan_;
 
   std::array<std::pair<double, double>, 6> controls_;
   int controls_count_;

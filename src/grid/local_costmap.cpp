@@ -9,6 +9,11 @@
 namespace grid {
 
 LocalCostmap::LocalCostmap() {
+  resolution_ = 0.1;
+  height_ = 100;
+  width_ = 100;
+  origin_x_ = 0.0;
+  origin_y_ = 0.0;
   inflation_radius_ = 0.2;
   inscribed_radius_ = 0.1;
   scaling_factor_ = 5.0;

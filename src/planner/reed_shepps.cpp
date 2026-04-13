@@ -32,7 +32,8 @@ void ReedShepps::setMinTurningRadius(double min_radius) {
   min_turning_radius_ = min_radius;
 }
 
-void ReedShepps::simulate(const Pose3d &start, const Pose3d &end) {
+void ReedShepps::simulate(const geometry::Pose3d &start,
+                          const geometry::Pose3d &end) {
   assert(min_turning_radius_ > 0);
   assert(distance_resolution_ > 0);
   assert(trig_table_ != nullptr);
@@ -53,15 +54,15 @@ void ReedShepps::simulate(const Pose3d &start, const Pose3d &end) {
   optimal_path_dist_ = std::numeric_limits<double>::infinity();
   optimal_path_segment_count_ = 0;
 
-  Pose3d relative = utils::changeOfBasis(start, end);
+  geometry::Pose3d relative = utils::changeOfBasis(start, end);
   relative.x /= min_turning_radius_;
   relative.y /= min_turning_radius_;
 
   double x = relative.x, y = relative.y, theta = relative.theta;
 
-  Pose3d relative_timeflip = Pose3d(-x, y, -theta);
-  Pose3d relative_reflect = Pose3d(x, -y, -theta);
-  Pose3d relative_timeflip_reflect = Pose3d(-x, -y, theta);
+  geometry::Pose3d relative_timeflip = geometry::Pose3d(-x, y, -theta);
+  geometry::Pose3d relative_reflect = geometry::Pose3d(x, -y, -theta);
+  geometry::Pose3d relative_timeflip_reflect = geometry::Pose3d(-x, -y, theta);
 
   for (auto fn : pathFns) {
     (this->*fn)(relative, false, false);
@@ -75,9 +76,9 @@ double ReedShepps::getOptimalDistance() {
   return optimal_path_dist_ * min_turning_radius_;
 }
 
-std::vector<Pose2d> ReedShepps::getOptimalPath() {
-  std::vector<Pose2d> poses;
-  Pose3d curr = start_;
+std::vector<geometry::Pose2d> ReedShepps::getOptimalPath() {
+  std::vector<geometry::Pose2d> poses;
+  geometry::Pose3d curr = start_;
   poses.push_back(curr);
 
   for (int i = 0; i < optimal_path_segment_count_; i++) {
@@ -137,7 +138,7 @@ void ReedShepps::tryPath(double dist, int count, bool timeflip, bool reflect) {
   std::copy_n(candidate_path_.begin(), count, optimal_path_.begin());
 }
 
-void ReedShepps::path1(const Pose3d &p, bool timeflip, bool reflect) {
+void ReedShepps::path1(const geometry::Pose3d &p, bool timeflip, bool reflect) {
   double phi = p.theta;
   auto [u, t] =
       utils::R(p.x - trig_table_->sin(phi), p.y - 1 + trig_table_->cos(phi));
@@ -152,7 +153,7 @@ void ReedShepps::path1(const Pose3d &p, bool timeflip, bool reflect) {
   tryPath(dist, 3, timeflip, reflect);
 }
 
-void ReedShepps::path2(const Pose3d &p, bool timeflip, bool reflect) {
+void ReedShepps::path2(const geometry::Pose3d &p, bool timeflip, bool reflect) {
   double phi = utils::M(p.theta);
   auto [rho, t1] =
       utils::R(p.x + trig_table_->sin(phi), p.y - 1 - trig_table_->cos(phi));
@@ -173,7 +174,7 @@ void ReedShepps::path2(const Pose3d &p, bool timeflip, bool reflect) {
   tryPath(dist, 3, timeflip, reflect);
 }
 
-void ReedShepps::path3(const Pose3d &p, bool timeflip, bool reflect) {
+void ReedShepps::path3(const geometry::Pose3d &p, bool timeflip, bool reflect) {
   double phi = p.theta;
   double x1 = p.x - trig_table_->sin(phi);
   double eta = p.y - 1 + trig_table_->cos(phi);
@@ -196,7 +197,7 @@ void ReedShepps::path3(const Pose3d &p, bool timeflip, bool reflect) {
   tryPath(dist, 3, timeflip, reflect);
 }
 
-void ReedShepps::path4(const Pose3d &p, bool timeflip, bool reflect) {
+void ReedShepps::path4(const geometry::Pose3d &p, bool timeflip, bool reflect) {
   double phi = p.theta;
   double x1 = p.x - trig_table_->sin(phi);
   double eta = p.y - 1 + trig_table_->cos(phi);
@@ -219,7 +220,7 @@ void ReedShepps::path4(const Pose3d &p, bool timeflip, bool reflect) {
   tryPath(dist, 3, timeflip, reflect);
 }
 
-void ReedShepps::path5(const Pose3d &p, bool timeflip, bool reflect) {
+void ReedShepps::path5(const geometry::Pose3d &p, bool timeflip, bool reflect) {
   double phi = p.theta;
   double x1 = p.x - trig_table_->sin(phi);
   double eta = p.y - 1 + trig_table_->cos(phi);
@@ -242,7 +243,7 @@ void ReedShepps::path5(const Pose3d &p, bool timeflip, bool reflect) {
   tryPath(dist, 3, timeflip, reflect);
 }
 
-void ReedShepps::path6(const Pose3d &p, bool timeflip, bool reflect) {
+void ReedShepps::path6(const geometry::Pose3d &p, bool timeflip, bool reflect) {
   double phi = p.theta;
   double x1 = p.x + trig_table_->sin(phi);
   double eta = p.y - 1 - trig_table_->cos(phi);
@@ -274,7 +275,7 @@ void ReedShepps::path6(const Pose3d &p, bool timeflip, bool reflect) {
   tryPath(dist, 4, timeflip, reflect);
 }
 
-void ReedShepps::path7(const Pose3d &p, bool timeflip, bool reflect) {
+void ReedShepps::path7(const geometry::Pose3d &p, bool timeflip, bool reflect) {
   double phi = p.theta;
   double xi = p.x + trig_table_->sin(phi);
   double eta = p.y - 1 - trig_table_->cos(phi);
@@ -302,7 +303,7 @@ void ReedShepps::path7(const Pose3d &p, bool timeflip, bool reflect) {
   tryPath(dist, 4, timeflip, reflect);
 }
 
-void ReedShepps::path8(const Pose3d &p, bool timeflip, bool reflect) {
+void ReedShepps::path8(const geometry::Pose3d &p, bool timeflip, bool reflect) {
   double phi = p.theta;
   double xi = p.x - trig_table_->sin(phi);
   double eta = p.y - 1 + trig_table_->cos(phi);
@@ -326,7 +327,7 @@ void ReedShepps::path8(const Pose3d &p, bool timeflip, bool reflect) {
   tryPath(dist, 4, timeflip, reflect);
 }
 
-void ReedShepps::path9(const Pose3d &p, bool timeflip, bool reflect) {
+void ReedShepps::path9(const geometry::Pose3d &p, bool timeflip, bool reflect) {
   double phi = p.theta;
   double xi = p.x - trig_table_->sin(phi);
   double eta = p.y - 1 + trig_table_->cos(phi);
@@ -350,7 +351,8 @@ void ReedShepps::path9(const Pose3d &p, bool timeflip, bool reflect) {
   tryPath(dist, 4, timeflip, reflect);
 }
 
-void ReedShepps::path10(const Pose3d &p, bool timeflip, bool reflect) {
+void ReedShepps::path10(const geometry::Pose3d &p, bool timeflip,
+                        bool reflect) {
   double phi = p.theta;
   double xi = p.x + trig_table_->sin(phi);
   double eta = p.y - 1 - trig_table_->cos(phi);
@@ -373,7 +375,8 @@ void ReedShepps::path10(const Pose3d &p, bool timeflip, bool reflect) {
   tryPath(dist, 4, timeflip, reflect);
 }
 
-void ReedShepps::path11(const Pose3d &p, bool timeflip, bool reflect) {
+void ReedShepps::path11(const geometry::Pose3d &p, bool timeflip,
+                        bool reflect) {
   double phi = p.theta;
   double xi = p.x + trig_table_->sin(phi);
   double eta = p.y - 1 - trig_table_->cos(phi);
@@ -397,7 +400,8 @@ void ReedShepps::path11(const Pose3d &p, bool timeflip, bool reflect) {
   tryPath(dist, 4, timeflip, reflect);
 }
 
-void ReedShepps::path12(const Pose3d &p, bool timeflip, bool reflect) {
+void ReedShepps::path12(const geometry::Pose3d &p, bool timeflip,
+                        bool reflect) {
   double phi = p.theta;
   double xi = p.x + trig_table_->sin(phi);
   double eta = p.y - 1 - trig_table_->cos(phi);

@@ -32,7 +32,7 @@ void Dubins::setMinTurningRadius(double min_radius) {
   min_turning_radius_ = min_radius;
 }
 
-void Dubins::simulate(const Pose3d &start, const Pose3d &end) {
+void Dubins::simulate(const geometry::Pose3d &start, const geometry::Pose3d &end) {
   assert(min_turning_radius_ > 0);
   assert(distance_resolution_ > 0);
   assert(trig_table_ != nullptr);
@@ -53,11 +53,11 @@ void Dubins::simulate(const Pose3d &start, const Pose3d &end) {
   optimal_path_dist_ = std::numeric_limits<double>::infinity();
   optimal_path_segment_count_ = 0;
 
-  Pose3d p = utils::changeOfBasis(start, end);
+  geometry::Pose3d p = utils::changeOfBasis(start, end);
   p.x /= min_turning_radius_;
   p.y /= min_turning_radius_;
 
-  Pose3d p_reflect(p.x, -p.y, -p.theta);
+  geometry::Pose3d p_reflect(p.x, -p.y, -p.theta);
 
   pathLSL(p, false);
   pathLSL(p_reflect, true);
@@ -82,9 +82,9 @@ double Dubins::getOptimalDistance() {
   return optimal_path_dist_ * min_turning_radius_;
 }
 
-std::vector<Pose2d> Dubins::getOptimalPath() {
-  std::vector<Pose2d> poses;
-  Pose3d curr = start_;
+std::vector<geometry::Pose2d> Dubins::getOptimalPath() {
+  std::vector<geometry::Pose2d> poses;
+  geometry::Pose3d curr = start_;
   poses.push_back(curr);
 
   for (int i = 0; i < optimal_path_segment_count_; i++) {
@@ -138,7 +138,7 @@ void Dubins::tryPath(double dist, int count, bool reflect) {
   std::copy_n(candidate_path_.begin(), count, optimal_path_.begin());
 }
 
-void Dubins::computeParams(const Pose3d &p, double &alpha, double &beta,
+void Dubins::computeParams(const geometry::Pose3d &p, double &alpha, double &beta,
                            double &d) {
   double dx = p.x;
   double dy = p.y;
@@ -150,7 +150,7 @@ void Dubins::computeParams(const Pose3d &p, double &alpha, double &beta,
   beta = utils::M2pi(p.theta - theta);
 }
 
-void Dubins::pathLSL(const Pose3d &p, bool reflect) {
+void Dubins::pathLSL(const geometry::Pose3d &p, bool reflect) {
   double alpha, beta, d;
   computeParams(p, alpha, beta, d);
 
@@ -179,7 +179,7 @@ void Dubins::pathLSL(const Pose3d &p, bool reflect) {
   tryPath(dist, 3, reflect);
 }
 
-void Dubins::pathRSR(const Pose3d &p, bool reflect) {
+void Dubins::pathRSR(const geometry::Pose3d &p, bool reflect) {
   double alpha, beta, d;
   computeParams(p, alpha, beta, d);
 
@@ -208,7 +208,7 @@ void Dubins::pathRSR(const Pose3d &p, bool reflect) {
   tryPath(dist, 3, reflect);
 }
 
-void Dubins::pathLSR(const Pose3d &p, bool reflect) {
+void Dubins::pathLSR(const geometry::Pose3d &p, bool reflect) {
   double alpha, beta, d;
   computeParams(p, alpha, beta, d);
 
@@ -236,7 +236,7 @@ void Dubins::pathLSR(const Pose3d &p, bool reflect) {
   tryPath(dist, 3, reflect);
 }
 
-void Dubins::pathRSL(const Pose3d &p, bool reflect) {
+void Dubins::pathRSL(const geometry::Pose3d &p, bool reflect) {
   double alpha, beta, d;
   computeParams(p, alpha, beta, d);
 
@@ -264,7 +264,7 @@ void Dubins::pathRSL(const Pose3d &p, bool reflect) {
   tryPath(dist, 3, reflect);
 }
 
-void Dubins::pathRLR(const Pose3d &p, bool reflect) {
+void Dubins::pathRLR(const geometry::Pose3d &p, bool reflect) {
   double alpha, beta, d;
   computeParams(p, alpha, beta, d);
 
@@ -294,7 +294,7 @@ void Dubins::pathRLR(const Pose3d &p, bool reflect) {
   tryPath(dist, 3, reflect);
 }
 
-void Dubins::pathLRL(const Pose3d &p, bool reflect) {
+void Dubins::pathLRL(const geometry::Pose3d &p, bool reflect) {
   double alpha, beta, d;
   computeParams(p, alpha, beta, d);
 

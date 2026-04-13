@@ -2,7 +2,7 @@
 
 #include <utility>
 
-namespace planner {
+namespace geometry {
 
 struct Pose3d {
   double x;

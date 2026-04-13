@@ -8,6 +8,8 @@ Grid::Grid() {
   resolution_ = 0.1;
   height_ = 100;
   width_ = 100;
+  origin_x_ = 0.0;
+  origin_y_ = 0.0;
 }
 
 void Grid::setGrid(nav_msgs::msg::OccupancyGrid::SharedPtr grid) {

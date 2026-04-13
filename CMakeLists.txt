@@ -23,8 +23,9 @@ add_executable(navigation
   src/grid/local_costmap.cpp 
   src/grid/grid.cpp
 
-  src/planner/pose.cpp
-  src/planner/state.cpp
+  src/geometry/pose.cpp
+  src/geometry/state.cpp
+
   src/planner/hybrid_astar.cpp
   src/planner/reed_shepps.cpp
   src/planner/dubins.cpp

@@ -1,7 +1,7 @@
-#include "planner/pose.h"
+#include "geometry/pose.h"
 #include <cmath>
 
-namespace planner {
+namespace geometry {
 
 Pose2d::Pose2d() {
   x = 0;

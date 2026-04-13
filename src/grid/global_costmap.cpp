@@ -11,6 +11,11 @@ GlobalCostmap::GlobalCostmap() {
   inflation_radius_ = 0.2;
   inscribed_radius_ = 0.1;
   scaling_factor_ = 5.0;
+  width_ = 0;
+  height_ = 0;
+  origin_x_ = 0.0;
+  origin_y_ = 0.0;
+  resolution_ = 0.1;
 };
 
 void GlobalCostmap::setParameters(nav_msgs::msg::OccupancyGrid::SharedPtr grid,

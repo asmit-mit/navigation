@@ -3,22 +3,22 @@
 #include <cmath>
 #include <utility>
 
-#include "planner/pose.h"
+#include "geometry/pose.h"
 
 namespace utils {
 
-double distance(const planner::Pose3d &a, const planner::Pose3d &b);
-double distance(const planner::Pose2d &a, const planner::Pose2d &b);
+double distance(const geometry::Pose3d &a, const geometry::Pose3d &b);
+double distance(const geometry::Pose2d &a, const geometry::Pose2d &b);
 
-planner::Pose2d perp(const planner::Pose2d &a, const planner::Pose2d &b);
+geometry::Pose2d perp(const geometry::Pose2d &a, const geometry::Pose2d &b);
 
 double M(double theta);
 std::pair<double, double> R(double x, double y);
-planner::Pose3d changeOfBasis(const planner::Pose3d &p1,
-                              const planner::Pose3d &p2);
+geometry::Pose3d changeOfBasis(const geometry::Pose3d &p1,
+                              const geometry::Pose3d &p2);
 double M2pi(double theta);
 
-inline double dot(const planner::Pose2d &a, const planner::Pose2d &b) {
+inline double dot(const geometry::Pose2d &a, const geometry::Pose2d &b) {
   return a.x * b.x + a.y * b.y;
 }
 

@@ -1,7 +1,8 @@
 #pragma once
 
 #include <utility>
-namespace planner {
+
+namespace geometry {
 
 struct State3d {
   int x;

@@ -4,7 +4,7 @@
 #include <vector>
 
 #include "planner/motion_states.h"
-#include "planner/pose.h"
+#include "geometry/pose.h"
 #include "utils/trig_utils.h"
 
 namespace planner {
@@ -17,9 +17,9 @@ public:
   void setDistanceResolution(double resolution);
   void setTolerance(double angle, double distance);
   void setMinTurningRadius(double min_radius);
-  void simulate(const Pose3d &start, const Pose3d &end);
+  void simulate(const geometry::Pose3d &start, const geometry::Pose3d &end);
   double getOptimalDistance();
-  std::vector<Pose2d> getOptimalPath();
+  std::vector<geometry::Pose2d> getOptimalPath();
 
 private:
   struct PathElement {
@@ -57,18 +57,18 @@ private:
   };
 
 private:
-  void path1(const Pose3d &p, bool timeflip, bool reflect);
-  void path2(const Pose3d &p, bool timeflip, bool reflect);
-  void path3(const Pose3d &p, bool timeflip, bool reflect);
-  void path4(const Pose3d &p, bool timeflip, bool reflect);
-  void path5(const Pose3d &p, bool timeflip, bool reflect);
-  void path6(const Pose3d &p, bool timeflip, bool reflect);
-  void path7(const Pose3d &p, bool timeflip, bool reflect);
-  void path8(const Pose3d &p, bool timeflip, bool reflect);
-  void path9(const Pose3d &p, bool timeflip, bool reflect);
-  void path10(const Pose3d &p, bool timeflip, bool reflect);
-  void path11(const Pose3d &p, bool timeflip, bool reflect);
-  void path12(const Pose3d &p, bool timeflip, bool reflect);
+  void path1(const geometry::Pose3d &p, bool timeflip, bool reflect);
+  void path2(const geometry::Pose3d &p, bool timeflip, bool reflect);
+  void path3(const geometry::Pose3d &p, bool timeflip, bool reflect);
+  void path4(const geometry::Pose3d &p, bool timeflip, bool reflect);
+  void path5(const geometry::Pose3d &p, bool timeflip, bool reflect);
+  void path6(const geometry::Pose3d &p, bool timeflip, bool reflect);
+  void path7(const geometry::Pose3d &p, bool timeflip, bool reflect);
+  void path8(const geometry::Pose3d &p, bool timeflip, bool reflect);
+  void path9(const geometry::Pose3d &p, bool timeflip, bool reflect);
+  void path10(const geometry::Pose3d &p, bool timeflip, bool reflect);
+  void path11(const geometry::Pose3d &p, bool timeflip, bool reflect);
+  void path12(const geometry::Pose3d &p, bool timeflip, bool reflect);
 
   void tryPath(double dist, int count, bool timeflip, bool reflect);
 
@@ -85,9 +85,9 @@ private:
   std::array<PathElement, 5> optimal_path_;
   std::array<PathElement, 5> candidate_path_;
 
-  Pose3d start_, end_;
+  geometry::Pose3d start_, end_;
 
-  using pathFn = void (ReedShepps::*)(const Pose3d &, bool, bool);
+  using pathFn = void (ReedShepps::*)(const geometry::Pose3d &, bool, bool);
 
   const std::array<pathFn, 12> pathFns = {
       &ReedShepps::path1,  &ReedShepps::path2,  &ReedShepps::path3,

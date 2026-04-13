@@ -23,9 +23,9 @@ public:
 
   MotionModelType getType() const;
   double getOptimalDistance();
-  std::vector<Pose2d> getOptimalPath();
+  std::vector<geometry::Pose2d> getOptimalPath();
 
-  void simulate(const Pose3d &start, const Pose3d &end);
+  void simulate(const geometry::Pose3d &start, const geometry::Pose3d &end);
 
 private:
   MotionModelType type_;

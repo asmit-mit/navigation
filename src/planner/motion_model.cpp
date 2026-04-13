@@ -26,7 +26,7 @@ void MotionModel::setMinTurningRadius(double min_radius) {
   reed_shepps_.setMinTurningRadius(min_radius);
 }
 
-void MotionModel::simulate(const Pose3d &start, const Pose3d &end) {
+void MotionModel::simulate(const geometry::Pose3d &start, const geometry::Pose3d &end) {
   if (type_ == MotionModelType::DUBINS) {
     dubins_.simulate(start, end);
   } else {
@@ -44,7 +44,7 @@ double MotionModel::getOptimalDistance() {
   }
 }
 
-std::vector<Pose2d> MotionModel::getOptimalPath() {
+std::vector<geometry::Pose2d> MotionModel::getOptimalPath() {
   if (type_ == MotionModelType::DUBINS) {
     return dubins_.getOptimalPath();
   } else {

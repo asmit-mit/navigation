@@ -122,8 +122,8 @@ private:
 
     int local_size =
         local_costmap_.getWindowWidth() * local_costmap_.getWindowHeight();
-    local_costmap_msg_.header = latest_map_->header;
 
+    local_costmap_msg_.header = latest_map_->header;
     local_costmap_msg_.info = latest_map_->info;
     local_costmap_msg_.info.width = local_costmap_.getWindowWidth();
     local_costmap_msg_.info.height = local_costmap_.getWindowHeight();
@@ -131,8 +131,8 @@ private:
         local_costmap_.getWindowOriginX();
     local_costmap_msg_.info.origin.position.y =
         local_costmap_.getWindowOriginY();
-
     local_costmap_msg_.data.resize(local_size);
+
     for (int i = 0; i < local_size; i++) {
       double c = local_costmap_.getCostAt(i);
       local_costmap_msg_.data[i] =
@@ -194,7 +194,7 @@ private:
 
     auto start = std::chrono::steady_clock::now();
 
-    std::vector<planner::Pose2d> path = planner_.getPlan();
+    std::vector<geometry::Pose2d> path = planner_.getPlan();
 
     auto end = std::chrono::steady_clock::now();
 

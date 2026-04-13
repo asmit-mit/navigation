@@ -4,8 +4,8 @@
 #include <cmath>
 #include <vector>
 
+#include "geometry/pose.h"
 #include "planner/motion_states.h"
-#include "planner/pose.h"
 #include "utils/trig_utils.h"
 
 namespace planner {
@@ -18,9 +18,9 @@ public:
   void setDistanceResolution(double resolution);
   void setTolerance(double angle, double distance);
   void setMinTurningRadius(double min_radius);
-  void simulate(const Pose3d &start, const Pose3d &end);
+  void simulate(const geometry::Pose3d &start, const geometry::Pose3d &end);
   double getOptimalDistance();
-  std::vector<Pose2d> getOptimalPath();
+  std::vector<geometry::Pose2d> getOptimalPath();
 
 private:
   struct PathElement {
@@ -40,15 +40,16 @@ private:
   };
 
 private:
-  void pathLSL(const Pose3d &p, bool reflect);
-  void pathRSR(const Pose3d &p, bool reflect);
-  void pathLSR(const Pose3d &p, bool reflect);
-  void pathRSL(const Pose3d &p, bool reflect);
-  void pathRLR(const Pose3d &p, bool reflect);
-  void pathLRL(const Pose3d &p, bool reflect);
+  void pathLSL(const geometry::Pose3d &p, bool reflect);
+  void pathRSR(const geometry::Pose3d &p, bool reflect);
+  void pathLSR(const geometry::Pose3d &p, bool reflect);
+  void pathRSL(const geometry::Pose3d &p, bool reflect);
+  void pathRLR(const geometry::Pose3d &p, bool reflect);
+  void pathLRL(const geometry::Pose3d &p, bool reflect);
 
   void tryPath(double dist, int count, bool reflect);
-  void computeParams(const Pose3d &p, double &alpha, double &beta, double &d);
+  void computeParams(const geometry::Pose3d &p, double &alpha, double &beta,
+                     double &d);
 
 private:
   const utils::TrigTable *trig_table_;
@@ -62,7 +63,7 @@ private:
   std::array<PathElement, 3> optimal_path_;
   std::array<PathElement, 3> candidate_path_;
 
-  Pose3d start_, end_;
+  geometry::Pose3d start_, end_;
 };
 
 }; // namespace planner

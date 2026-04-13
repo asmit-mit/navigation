@@ -1,7 +1,8 @@
-#include "planner/state.h"
+#include "geometry/state.h"
+
 #include <functional>
 
-namespace planner {
+namespace geometry {
 
 State3d::State3d() {}
 

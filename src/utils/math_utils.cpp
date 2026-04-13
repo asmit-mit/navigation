@@ -2,26 +2,26 @@
 
 namespace utils {
 
-double distance(const planner::Pose3d &a, const planner::Pose3d &b) {
+double distance(const geometry::Pose3d &a, const geometry::Pose3d &b) {
   double dx = a.x - b.x;
   double dy = a.y - b.y;
   return std::hypot(dx, dy);
 }
 
-double distance(const planner::Pose2d &a, const planner::Pose2d &b) {
+double distance(const geometry::Pose2d &a, const geometry::Pose2d &b) {
   double dx = a.x - b.x;
   double dy = a.y - b.y;
   return std::hypot(dx, dy);
 }
 
-planner::Pose2d perp(const planner::Pose2d &a, const planner::Pose2d &b) {
+geometry::Pose2d perp(const geometry::Pose2d &a, const geometry::Pose2d &b) {
   double mod_b2 = b.norm2();
 
   if (mod_b2 <= 1e-6)
-    return planner::Pose2d(0, 0);
+    return geometry::Pose2d(0, 0);
 
   double scale = dot(a, b) / mod_b2;
-  planner::Pose2d projection = b * scale;
+  geometry::Pose2d projection = b * scale;
 
   return a - projection;
 }
@@ -38,8 +38,8 @@ std::pair<double, double> R(double x, double y) {
   return {r, theta};
 }
 
-planner::Pose3d changeOfBasis(const planner::Pose3d &p1,
-                              const planner::Pose3d &p2) {
+geometry::Pose3d changeOfBasis(const geometry::Pose3d &p1,
+                              const geometry::Pose3d &p2) {
   double theta1 = p1.theta;
   double dx = p2.x - p1.x;
   double dy = p2.y - p1.y;
@@ -48,7 +48,7 @@ planner::Pose3d changeOfBasis(const planner::Pose3d &p1,
   double new_y = -dx * std::sin(theta1) + dy * std::cos(theta1);
   double new_theta = M(p2.theta - p1.theta);
 
-  return planner::Pose3d(new_x, new_y, new_theta);
+  return geometry::Pose3d(new_x, new_y, new_theta);
 }
 
 double M2pi(double theta) {

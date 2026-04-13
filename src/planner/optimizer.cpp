@@ -18,11 +18,12 @@ void Optimizer::setWeights(double smooth, double data) {
 
 void Optimizer::setIterations(int iterations) { iterations_ = iterations; }
 
-std::vector<Pose2d> Optimizer::getSmoothPath(std::vector<Pose2d> &plan) const {
+std::vector<geometry::Pose2d>
+Optimizer::getSmoothPath(std::vector<geometry::Pose2d> &plan) const {
   if (plan.size() < 3)
     return plan;
 
-  std::vector<Pose2d> new_path = plan;
+  std::vector<geometry::Pose2d> new_path = plan;
 
   for (int iter = 0; iter < iterations_; iter++) {
     double change = 0.0;
