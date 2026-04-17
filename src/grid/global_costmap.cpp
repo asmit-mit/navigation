@@ -36,7 +36,7 @@ void GlobalCostmap::setParameters(nav_msgs::msg::OccupancyGrid::SharedPtr grid,
   costmap_.resize(height_ * width_);
 
   inflation_radius_ = radius;
-  inscribed_radius_ = 0.1;
+  inscribed_radius_ = 0.2;
 
   scaling_factor_ = scaling_factor;
 

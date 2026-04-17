@@ -10,6 +10,7 @@ void RegulatedPurePursuit::setParameters(const grid::LocalCostmap *costmap,
                                          controller::ControllerParams &params) {
   costmap_ = costmap;
   trig_table_ = trig_table;
+
   max_linear_velocity_ = params.max_linear_velocity;
   max_angular_velocity_ = params.max_angular_velocity;
   lookahead_distance_ = params.lookahead_distance;
@@ -17,6 +18,8 @@ void RegulatedPurePursuit::setParameters(const grid::LocalCostmap *costmap,
   max_lookahead_distance_ = params.max_lookahead_distance;
   min_lookahead_distance_ = params.min_lookahead_distance;
   proximity_distance_ = params.proximity_distance;
+  approach_velocity_scaling_dist_ = params.approach_velocity_scaling_dist;
+  min_approach_linear_velocity_ = params.min_approach_linear_velocity;
 
   proximity_heurisitc_scale_ = std::min(params.proximity_heurisitc_scale, 1.0);
 
@@ -37,13 +40,14 @@ std::pair<double, double> RegulatedPurePursuit::computeCommand(
   geometry::Pose2d lookahead_point =
       findLookaheadPoint(curr_pose, plan, lookahead_dist);
 
+  // add constraints here
+
   double k = computeCurvature(curr_pose, lookahead_point);
 
   double v = max_linear_velocity_;
-
-  double v_curvature = regulateByCurvature(v, k);
-  double v_proximity = regulateByCostmap(curr_pose, v);
-  v = std::min(v_curvature, v_proximity);
+  v = std::min(v, regulateByCurvature(v, k));
+  v = std::min(v, regulateByCostmap(v, curr_pose));
+  v = std::min(v, regulateByGoalProximity(v, curr_pose, plan));
 
   double w = k * v;
   w = std::clamp(w, -max_angular_velocity_, max_angular_velocity_);
@@ -102,8 +106,8 @@ double RegulatedPurePursuit::regulateByCurvature(double v, double curvature) {
 }
 
 double
-RegulatedPurePursuit::regulateByCostmap(const geometry::Pose3d &curr_pose,
-                                        double v) {
+RegulatedPurePursuit::regulateByCostmap(double v,
+                                        const geometry::Pose3d &curr_pose) {
   double d_O = costmap_->getDistanceAtWorld(curr_pose.x, curr_pose.y);
   if (d_O < 0.0 || d_O > proximity_distance_)
     return v;
@@ -111,8 +115,22 @@ RegulatedPurePursuit::regulateByCostmap(const geometry::Pose3d &curr_pose,
   double scale = proximity_heurisitc_scale_ * (d_O / proximity_distance_);
   scale = std::clamp(scale, 0.0, 1.0);
 
-  constexpr double MIN_SPEED = 0.05;
-  return std::max(v * scale, MIN_SPEED);
+  return std::max(v * scale, min_approach_linear_velocity_);
+}
+
+double RegulatedPurePursuit::regulateByGoalProximity(
+    double v, const geometry::Pose3d &curr_pose,
+    const std::vector<geometry::Pose2d> &plan) {
+  double dist_to_goal = utils::distance(curr_pose, plan.back());
+  if (dist_to_goal >= approach_velocity_scaling_dist_)
+    return v;
+
+  double scale = dist_to_goal / approach_velocity_scaling_dist_;
+  double approach_vel = v * scale;
+
+  approach_vel = std::max(approach_vel, min_approach_linear_velocity_);
+
+  return std::min(v, approach_vel);
 }
 
 bool RegulatedPurePursuit::goalReached(const geometry::Pose3d &curr_pose,

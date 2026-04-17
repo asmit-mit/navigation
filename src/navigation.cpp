@@ -59,11 +59,14 @@ public:
     local_costmap_pub_ = this->create_publisher<nav_msgs::msg::OccupancyGrid>(
         "/local_costmap", 10);
 
-    nav_timer_ = this->create_wall_timer(
-        500ms, std::bind(&Navigation::navCallback, this));
+    planner_timer_ = this->create_wall_timer(
+        500ms, std::bind(&Navigation::plannerCallback, this));
+
+    controller_timer_ = this->create_wall_timer(
+        100ms, std::bind(&Navigation::controllerCallack, this));
 
     costmap_timer_ = this->create_wall_timer(
-        500ms, std::bind(&Navigation::costmapCallback, this));
+        200ms, std::bind(&Navigation::costmapCallback, this));
 
     RCLCPP_INFO(this->get_logger(), "navigation node started");
   }
@@ -166,28 +169,27 @@ private:
     local_costmap_pub_->publish(local_costmap_msg_);
   }
 
-  void navCallback() {
+  void plannerCallback() {
     if (!latest_map_ || !have_start_ || !have_goal_)
       return;
 
-    double start_x = start_pose_.pose.position.x;
-    double start_y = start_pose_.pose.position.y;
+    double roll, pitch;
+    start_x_ = start_pose_.pose.position.x;
+    start_y_ = start_pose_.pose.position.y;
 
     tf2::Quaternion q_start;
     tf2::fromMsg(start_pose_.pose.orientation, q_start);
-    double roll, pitch, start_theta;
-    tf2::Matrix3x3(q_start).getRPY(roll, pitch, start_theta);
+    tf2::Matrix3x3(q_start).getRPY(roll, pitch, start_theta_);
 
-    double goal_x = goal_pose_.pose.position.x;
-    double goal_y = goal_pose_.pose.position.y;
+    goal_x_ = goal_pose_.pose.position.x;
+    goal_y_ = goal_pose_.pose.position.y;
 
     tf2::Quaternion q_goal;
     tf2::fromMsg(goal_pose_.pose.orientation, q_goal);
-    double goal_theta;
-    tf2::Matrix3x3(q_goal).getRPY(roll, pitch, goal_theta);
+    tf2::Matrix3x3(q_goal).getRPY(roll, pitch, goal_theta_);
 
-    RCLCPP_INFO(this->get_logger(), "Start: %f %f", start_x, start_y);
-    RCLCPP_INFO(this->get_logger(), "Goal: %f %f", goal_x, goal_y);
+    RCLCPP_INFO(this->get_logger(), "Start: %f %f", start_x_, start_y_);
+    RCLCPP_INFO(this->get_logger(), "Goal: %f %f", goal_x_, goal_y_);
 
     optimizer_.setCostmap(&global_costmap_);
     optimizer_.setIterations(1000);
@@ -196,11 +198,11 @@ private:
     motion_model_.setTrigTable(&trig_table_);
     motion_model_.setMotionModel(planner::MotionModelType::DUBINS);
     motion_model_.setDistanceResolution(global_costmap_.getResolution());
-    motion_model_.setMinTurningRadius(0.22 / 1.0);
+    motion_model_.setMinTurningRadius(0.5 / 1.0);
     motion_model_.setTolerance(0.5, 0.2);
 
     planner::HybridAstarParams planner_params;
-    planner_params.max_linear_velocity = 0.22;
+    planner_params.max_linear_velocity = 0.5;
     planner_params.max_angular_velocity = 1.0;
     planner_params.distance_tolerance = 0.5;
     planner_params.angular_tolerance = 0.2;
@@ -212,19 +214,12 @@ private:
 
     planner_.setParameters(&global_costmap_, &optimizer_, &motion_model_,
                            &trig_table_, planner_params);
-    planner_.setStart(start_x, start_y, start_theta);
-    planner_.setGoal(goal_x, goal_y, goal_theta);
-
-    controller::ControllerParams controller_params;
-    controller_params.max_linear_velocity = 0.22;
-    controller_params.max_angular_velocity = 1.0;
-    controller_params.distance_tolerance = 0.5;
-
-    controller_.setParameters(&local_costmap_, &trig_table_, controller_params);
+    planner_.setStart(start_x_, start_y_, start_theta_);
+    planner_.setGoal(goal_x_, goal_y_, goal_theta_);
 
     auto start = std::chrono::steady_clock::now();
 
-    std::vector<geometry::Pose2d> path = planner_.getPlan();
+    path_ = planner_.getPlan();
 
     auto end = std::chrono::steady_clock::now();
 
@@ -233,27 +228,16 @@ private:
 
     RCLCPP_INFO(get_logger(), "Planning time: %f ms", time_ms);
 
-    if (path.empty()) {
+    if (path_.empty()) {
       RCLCPP_WARN(this->get_logger(), "No path found");
       return;
     }
-
-    auto [v, w] = controller_.computeCommand(
-        geometry::Pose3d(start_x, start_y, start_theta), linear_velocity_,
-        path);
-    RCLCPP_INFO(get_logger(), "Publishing v: %f and w: %f", v, w);
-
-    geometry_msgs::msg::Twist cmd;
-    cmd.linear.x = v;
-    cmd.angular.z = w;
-
-    cmd_vel_pub_->publish(cmd);
 
     nav_msgs::msg::Path ros_path;
     ros_path.header.stamp = this->now();
     ros_path.header.frame_id = latest_map_->header.frame_id;
 
-    for (const auto &pose : path) {
+    for (const auto &pose : path_) {
       geometry_msgs::msg::PoseStamped pose_stamped;
       pose_stamped.header = ros_path.header;
 
@@ -274,8 +258,32 @@ private:
                 ros_path.poses.size());
   }
 
+  void controllerCallack() {
+    if (!latest_map_ || !have_start_ || !have_goal_ || path_.empty())
+      return;
+
+    controller::ControllerParams controller_params;
+    controller_params.max_linear_velocity = 0.5;
+    controller_params.max_angular_velocity = 1.0;
+    controller_params.distance_tolerance = 0.001;
+
+    controller_.setParameters(&local_costmap_, &trig_table_, controller_params);
+
+    auto [v, w] = controller_.computeCommand(
+        geometry::Pose3d(start_x_, start_y_, start_theta_), linear_velocity_,
+        path_);
+    RCLCPP_INFO(get_logger(), "Publishing v: %f and w: %f", v, w);
+
+    geometry_msgs::msg::Twist cmd;
+    cmd.linear.x = v;
+    cmd.angular.z = w;
+
+    cmd_vel_pub_->publish(cmd);
+  }
+
 private:
-  rclcpp::TimerBase::SharedPtr nav_timer_;
+  rclcpp::TimerBase::SharedPtr planner_timer_;
+  rclcpp::TimerBase::SharedPtr controller_timer_;
   rclcpp::TimerBase::SharedPtr costmap_timer_;
 
   rclcpp::Subscription<nav_msgs::msg::OccupancyGrid>::SharedPtr map_sub_;
@@ -294,6 +302,7 @@ private:
 
   geometry_msgs::msg::PoseStamped start_pose_;
   geometry_msgs::msg::PoseStamped goal_pose_;
+  std::vector<geometry::Pose2d> path_;
 
   utils::EDT edt_;
   utils::TrigTable trig_table_ = utils::TrigTable(10000);
@@ -303,6 +312,9 @@ private:
   planner::Optimizer optimizer_;
   planner::MotionModel motion_model_;
   controller::RegulatedPurePursuit controller_;
+
+  double start_x_, start_y_, start_theta_;
+  double goal_x_, goal_y_, goal_theta_;
 
   bool have_start_ = false;
   bool have_goal_ = false;

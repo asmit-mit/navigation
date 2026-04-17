@@ -29,7 +29,9 @@ private:
                           const geometry::Pose2d &lookahead_point);
 
   double regulateByCurvature(double v, double curvature);
-  double regulateByCostmap(const geometry::Pose3d &curr_pose, double v);
+  double regulateByCostmap(double v, const geometry::Pose3d &curr_pose);
+  double regulateByGoalProximity(double v, const geometry::Pose3d &curr_pose,
+                                 const std::vector<geometry::Pose2d> &plan);
 
   bool goalReached(const geometry::Pose3d &curr_pose,
                    const geometry::Pose2d &end) const;
@@ -47,11 +49,13 @@ private:
   double proximity_distance_;
   double proximity_heurisitc_scale_;
 
+  double approach_velocity_scaling_dist_;
+  double min_approach_linear_velocity_;
+
   double distance_tolerance_;
 
   double min_turning_radius_;
   double T_k_;
-    
 
   static constexpr double epsilon_ = 1e-6;
 
@@ -59,4 +63,4 @@ private:
   const utils::TrigTable *trig_table_;
 };
 
-} // namespace contoller
+} // namespace controller
