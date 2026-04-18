@@ -36,13 +36,11 @@ std::pair<double, double> RegulatedPurePursuit::computeCommand(
     return {0.0, 0.0};
 
   double lookahead_dist = computeLookaheadDistance(linear_velocity);
-
-  geometry::Pose2d lookahead_point =
-      findLookaheadPoint(curr_pose, plan, lookahead_dist);
+  lookahead_point_ = findLookaheadPoint(curr_pose, plan, lookahead_dist);
 
   // add constraints here
 
-  double k = computeCurvature(curr_pose, lookahead_point);
+  double k = computeCurvature(curr_pose, lookahead_point_);
 
   double v = max_linear_velocity_;
   v = std::min(v, regulateByCurvature(v, k));
@@ -76,6 +74,10 @@ geometry::Pose2d RegulatedPurePursuit::findLookaheadPoint(
   }
 
   return plan.back();
+}
+
+geometry::Pose2d RegulatedPurePursuit::getLookaheadPoint() {
+  return lookahead_point_;
 }
 
 double RegulatedPurePursuit::computeCurvature(

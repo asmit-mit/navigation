@@ -20,6 +20,7 @@ public:
   std::pair<double, double>
   computeCommand(const geometry::Pose3d &curr_pose, double linear_velocity,
                  const std::vector<geometry::Pose2d> &plan);
+  geometry::Pose2d getLookaheadPoint();
 
 private:
   geometry::Pose2d findLookaheadPoint(const geometry::Pose3d &curr_pose,
@@ -59,6 +60,7 @@ private:
 
   static constexpr double epsilon_ = 1e-6;
 
+  geometry::Pose2d lookahead_point_;
   const grid::LocalCostmap *costmap_;
   const utils::TrigTable *trig_table_;
 };

@@ -10,6 +10,7 @@
 #include "nav_msgs/msg/odometry.hpp"
 #include "nav_msgs/msg/path.hpp"
 #include "rclcpp/rclcpp.hpp"
+#include "visualization_msgs/msg/marker.hpp"
 
 #include "tf2/LinearMath/Matrix3x3.hpp"
 #include "tf2_geometry_msgs/tf2_geometry_msgs.hpp"
@@ -59,11 +60,15 @@ public:
     local_costmap_pub_ = this->create_publisher<nav_msgs::msg::OccupancyGrid>(
         "/local_costmap", 10);
 
+    lookahead_pose_pub_ =
+        this->create_publisher<visualization_msgs::msg::Marker>(
+            "/lookahead_pose", 10);
+
     planner_timer_ = this->create_wall_timer(
         500ms, std::bind(&Navigation::plannerCallback, this));
 
     controller_timer_ = this->create_wall_timer(
-        100ms, std::bind(&Navigation::controllerCallack, this));
+        100ms, std::bind(&Navigation::controllerCallback, this));
 
     costmap_timer_ = this->create_wall_timer(
         200ms, std::bind(&Navigation::costmapCallback, this));
@@ -258,7 +263,7 @@ private:
                 ros_path.poses.size());
   }
 
-  void controllerCallack() {
+  void controllerCallback() {
     if (!latest_map_ || !have_start_ || !have_goal_ || path_.empty())
       return;
 
@@ -273,6 +278,38 @@ private:
         geometry::Pose3d(start_x_, start_y_, start_theta_), linear_velocity_,
         path_);
     RCLCPP_INFO(get_logger(), "Publishing v: %f and w: %f", v, w);
+
+    geometry::Pose2d lookahead_point = controller_.getLookaheadPoint();
+
+    visualization_msgs::msg::Marker marker;
+
+    marker.header.frame_id = latest_map_->header.frame_id;
+    marker.header.stamp = this->get_clock()->now();
+
+    marker.ns = "lookahead";
+    marker.id = 0;
+
+    marker.type = visualization_msgs::msg::Marker::SPHERE;
+    marker.action = visualization_msgs::msg::Marker::ADD;
+
+    marker.pose.position.x = lookahead_point.x;
+    marker.pose.position.y = lookahead_point.y;
+    marker.pose.position.z = 0.0;
+
+    marker.pose.orientation.w = 1.0;
+
+    marker.scale.x = 0.2;
+    marker.scale.y = 0.2;
+    marker.scale.z = 0.2;
+
+    marker.color.r = 1.0;
+    marker.color.g = 0.0;
+    marker.color.b = 0.5;
+    marker.color.a = 1.0;
+
+    marker.lifetime = rclcpp::Duration::from_seconds(0);
+
+    lookahead_pose_pub_->publish(marker);
 
     geometry_msgs::msg::Twist cmd;
     cmd.linear.x = v;
@@ -294,6 +331,8 @@ private:
   rclcpp::Publisher<nav_msgs::msg::OccupancyGrid>::SharedPtr
       global_costmap_pub_;
   rclcpp::Publisher<nav_msgs::msg::OccupancyGrid>::SharedPtr local_costmap_pub_;
+  rclcpp::Publisher<visualization_msgs::msg::Marker>::SharedPtr
+      lookahead_pose_pub_;
   rclcpp::Publisher<geometry_msgs::msg::Twist>::SharedPtr cmd_vel_pub_;
 
   nav_msgs::msg::OccupancyGrid::SharedPtr latest_map_;
