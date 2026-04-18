@@ -1,20 +1,21 @@
 #pragma once
 
+#include <cstddef>
 #include <vector>
 
 namespace utils {
 
 class DSU {
 private:
-  std::vector<int> parent;
-  std::vector<int> size;
+  std::vector<size_t> parent;
+  std::vector<size_t> size;
 
 public:
   DSU() {}
 
-  void init(int n);
-  int find(int x);
-  bool unite(int a, int b);
+  void init(size_t n);
+  size_t find(size_t x);
+  bool unite(size_t a, size_t b);
 };
 
 } // namespace utils

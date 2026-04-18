@@ -49,8 +49,8 @@ Optimizer::getSmoothPath(std::vector<geometry::Pose2d> &plan) const {
           (grid::GlobalCostmap::INSCRIBED_COST - 1))
         continue;
 
-      change += std::fabs(new_x - new_path[i].x);
-      change += std::fabs(new_y - new_path[i].y);
+      change += std::abs(new_x - new_path[i].x);
+      change += std::abs(new_y - new_path[i].y);
 
       new_path[i].x = new_x;
       new_path[i].y = new_y;

@@ -16,17 +16,17 @@ public:
                      double window_size, double inflation_radius,
                      double inscribed_radius, double scaling_factor);
 
-  double getWindowWidth() const;
-  double getWindowHeight() const;
+  size_t getWindowWidth() const;
+  size_t getWindowHeight() const;
   double getWindowOriginX() const;
   double getWindowOriginY() const;
 
-  double getCostAt(int idx) const;
-  double getCostAt(int local_x, int local_y) const;
+  double getCostAt(size_t idx) const;
+  double getCostAt(size_t local_x, size_t local_y) const;
   double getCostAtWorld(double world_x, double world_y) const;
 
   double getDistanceAt(int idx) const;
-  double getDistanceAt(int local_x, int local_y) const;
+  double getDistanceAt(size_t local_x, size_t local_y) const;
   double getDistanceAtWorld(double world_x, double world_y) const;
 
 public:
@@ -39,7 +39,7 @@ private:
   double computeCost(double dist);
   void computeDistToCostMap();
 
-  int localIndex(int local_x, int local_y) const;
+  size_t localIndex(size_t local_x, size_t local_y) const;
 
 private:
   const utils::EDT *edt_;
@@ -47,9 +47,9 @@ private:
   double inflation_radius_, inscribed_radius_;
   double scaling_factor_;
 
-  int window_width_, window_height_;
+  size_t window_width_, window_height_;
   double window_origin_x_, window_origin_y_;
-  int global_offset_x_, global_offset_y_;
+  size_t global_offset_x_, global_offset_y_;
 
   static constexpr double epsilon_ = 1e-6;
 

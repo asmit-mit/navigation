@@ -15,8 +15,8 @@ public:
                      const utils::EDT *edt, double inflation_radius,
                      double inscribed_radius, double scaling_factor);
 
-  double getCostAt(int idx) const;
-  double getCostAt(int x, int y) const;
+  double getCostAt(size_t idx) const;
+  double getCostAt(size_t x, size_t y) const;
 
 public:
   static constexpr int COST_PRECISION = 100;

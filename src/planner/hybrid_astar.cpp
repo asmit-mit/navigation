@@ -121,7 +121,7 @@ geometry::State3d HybridAStar::poseToState(const geometry::Pose3d &p) {
 
   double theta_deg = p.theta * theta_to_deg_;
   theta_deg -= 360.0 * std::floor(theta_deg / 360.0);
-  const int theta_bin =
+  const size_t theta_bin =
       static_cast<int>(std::floor(theta_deg / angular_resolution_));
 
   return geometry::State3d(x, y, theta_bin);
@@ -135,17 +135,17 @@ geometry::Pose2d HybridAStar::state2dToPose2d(const geometry::State2d &s) {
   return geometry::Pose2d(costmap_->mapToWorld(s.x, s.y));
 }
 
-int HybridAStar::getStateIndex(const geometry::State3d &state) const {
+size_t HybridAStar::getStateIndex(const geometry::State3d &state) const {
   return state.theta_bin * height_ * width_ + state.y * width_ + state.x;
 }
 
-geometry::State2d HybridAStar::stateIndexToState2d(int index) const {
-  int area = height_ * width_;
+geometry::State2d HybridAStar::stateIndexToState2d(size_t index) const {
+  size_t area = height_ * width_;
 
-  int rem = index % area;
+  size_t rem = index % area;
 
-  int x = rem % width_;
-  int y = rem / width_;
+  size_t x = rem % width_;
+  size_t y = rem / width_;
 
   return geometry::State2d(x, y);
 }
@@ -158,7 +158,7 @@ void HybridAStar::buildObstacleCostTable() {
   if (!costmap_->isValid(start_x, start_y))
     return;
 
-  const int start_idx = costmap_->getIndex(start_x, start_y);
+  const size_t start_idx = costmap_->getIndex(start_x, start_y);
 
   std::priority_queue<std::pair<double, int>,
                       std::vector<std::pair<double, int>>, std::greater<>>
@@ -174,17 +174,17 @@ void HybridAStar::buildObstacleCostTable() {
     if (cost > holonomic_with_obstacle_cost_.get(idx))
       continue;
 
-    const int x = idx % width_;
-    const int y = idx / width_;
+    const size_t x = idx % width_;
+    const size_t y = idx / width_;
 
     for (int i = 0; i < 8; i++) {
-      int new_x = x + dx_[i];
-      int new_y = y + dy_[i];
+      size_t new_x = x + dx_[i];
+      size_t new_y = y + dy_[i];
 
       if (!costmap_->isValid(new_x, new_y))
         continue;
 
-      const int new_idx = costmap_->getIndex(new_x, new_y);
+      const size_t new_idx = costmap_->getIndex(new_x, new_y);
       const double move_cost = (dx_[i] == 0 || dy_[i] == 0)
                                    ? map_resolution_
                                    : map_resolution_ * 1.41421356;
@@ -272,7 +272,7 @@ void HybridAStar::simulate() {
 
       const double next_g_cost = curr->g_cost + traversal_cost;
 
-      const int next_state_idx = getStateIndex(next_state);
+      const size_t next_state_idx = getStateIndex(next_state);
 
       if (node_pool_.isSet(next_state_idx) &&
           next_g_cost >= node_pool_.get(next_state_idx).g_cost)

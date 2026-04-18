@@ -24,22 +24,21 @@ void Grid::setGrid(nav_msgs::msg::OccupancyGrid::SharedPtr grid) {
 int Grid::getDataAt(int idx) const { return grid_->data[idx]; }
 int Grid::getDataAt(int x, int y) const { return grid_->data[getIndex(x, y)]; }
 
-int Grid::getHeight() const { return height_; }
-int Grid::getWidth() const { return width_; }
+size_t Grid::getHeight() const { return height_; }
+size_t Grid::getWidth() const { return width_; }
 double Grid::getResolution() const { return resolution_; }
 double Grid::getOriginX() const { return origin_x_; }
 double Grid::getOriginY() const { return origin_y_; }
 
-bool Grid::isValid(int x, int y) const {
-  return x >= 0 && y >= 0 && x < width_ && y < height_ &&
-         grid_->data[getIndex(x, y)] != 100;
+bool Grid::isValid(size_t x, size_t y) const {
+  return x < width_ && y < height_ && grid_->data[getIndex(x, y)] != 100;
 }
 
-int Grid::getIndex(int x, int y) const { return y * width_ + x; }
+size_t Grid::getIndex(size_t x, size_t y) const { return y * width_ + x; }
 
-std::pair<int, int> Grid::worldToMapDiscrete(double x, double y) const {
-  int gx = floor((x - origin_x_) / resolution_);
-  int gy = floor((y - origin_y_) / resolution_);
+std::pair<size_t, size_t> Grid::worldToMapDiscrete(double x, double y) const {
+  size_t gx = floor((x - origin_x_) / resolution_);
+  size_t gy = floor((y - origin_y_) / resolution_);
   return {gx, gy};
 }
 

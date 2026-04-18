@@ -2,15 +2,15 @@
 
 namespace utils {
 
-void DSU::init(int n) {
+void DSU::init(size_t n) {
   parent.resize(n);
   size.assign(n, 1);
-  for (int i = 0; i < n; ++i)
+  for (size_t i = 0; i < n; ++i)
     parent[i] = i;
 }
 
-int DSU::find(int x) {
-  int root = x;
+size_t DSU::find(size_t x) {
+  size_t root = x;
 
   while (root != parent[root])
     root = parent[root];
@@ -24,9 +24,9 @@ int DSU::find(int x) {
   return root;
 }
 
-bool DSU::unite(int a, int b) {
-  int ra = find(a);
-  int rb = find(b);
+bool DSU::unite(size_t a, size_t b) {
+  size_t ra = find(a);
+  size_t rb = find(b);
 
   if (ra == rb)
     return false;

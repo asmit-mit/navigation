@@ -13,22 +13,22 @@ public:
 
   int getDataAt(int x, int y) const;
   int getDataAt(int idx) const;
-  int getHeight() const;
-  int getWidth() const;
+  size_t getHeight() const;
+  size_t getWidth() const;
   double getResolution() const;
   double getOriginX() const;
   double getOriginY() const;
 
-  bool isValid(int x, int y) const;
-  int getIndex(int x, int y) const;
+  bool isValid(size_t x, size_t y) const;
+  size_t getIndex(size_t x, size_t y) const;
 
-  std::pair<int, int> worldToMapDiscrete(double x, double y) const;
+  std::pair<size_t, size_t> worldToMapDiscrete(double x, double y) const;
   std::pair<double, double> worldToMapContinous(double x, double y) const;
   std::pair<double, double> mapToWorld(double x, double y) const;
 
 protected:
   double resolution_;
-  int height_, width_;
+  size_t height_, width_;
   double origin_x_, origin_y_;
 
   nav_msgs::msg::OccupancyGrid::SharedPtr grid_;

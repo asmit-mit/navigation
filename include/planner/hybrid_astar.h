@@ -50,8 +50,8 @@ private:
   geometry::State3d poseToState(const geometry::Pose3d &p);
   geometry::State2d pose2dToState2d(const geometry::Pose2d &p);
   geometry::Pose2d state2dToPose2d(const geometry::State2d &s);
-  int getStateIndex(const geometry::State3d &state) const;
-  geometry::State2d stateIndexToState2d(int index) const;
+  size_t getStateIndex(const geometry::State3d &state) const;
+  geometry::State2d stateIndexToState2d(size_t index) const;
 
   void buildObstacleCostTable();
   double heuristic(const Node *node);
@@ -62,7 +62,7 @@ private:
   void simulate();
 
 private:
-  int height_, width_;
+  size_t height_, width_;
 
   double angular_resolution_, map_resolution_;
   double angular_tolerance_, distance_tolerance_;
@@ -81,8 +81,8 @@ private:
   double path_length_weight_;
 
   int max_explore_iterations_;
-  int num_theta_bins_;
-  int state_space_size_;
+  size_t num_theta_bins_;
+  size_t state_space_size_;
 
   geometry::Pose3d start_, end_;
 

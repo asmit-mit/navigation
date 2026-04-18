@@ -7,7 +7,7 @@ namespace utils {
 
 class TrigTable {
 public:
-  TrigTable(int precision = 4096);
+  TrigTable(size_t precision = 4096);
 
   double sin(double theta) const;
   double cos(double theta) const;
@@ -16,7 +16,7 @@ private:
   std::vector<double> sin_table;
   std::vector<double> cos_table;
 
-  int size;
+  size_t size;
   double step;
   double inv_step;
 

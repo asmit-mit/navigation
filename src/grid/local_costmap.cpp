@@ -52,13 +52,13 @@ void LocalCostmap::setParameters(nav_msgs::msg::OccupancyGrid::SharedPtr grid,
 
   auto [center_cell_x, center_cell_y] = worldToMapDiscrete(robot_x, robot_y);
 
-  int half_cells =
+  size_t half_cells =
       static_cast<int>(std::ceil((window_size / 2.0) / resolution_));
 
-  int x_min = std::max(0, center_cell_x - half_cells);
-  int y_min = std::max(0, center_cell_y - half_cells);
-  int x_max = std::min(width_ - 1, center_cell_x + half_cells);
-  int y_max = std::min(height_ - 1, center_cell_y + half_cells);
+  size_t x_min = std::max(0UL, center_cell_x - half_cells);
+  size_t y_min = std::max(0UL, center_cell_y - half_cells);
+  size_t x_max = std::min(width_ - 1, center_cell_x + half_cells);
+  size_t y_max = std::min(height_ - 1, center_cell_y + half_cells);
 
   window_width_ = x_max - x_min + 1;
   window_height_ = y_max - y_min + 1;
@@ -75,19 +75,17 @@ void LocalCostmap::setParameters(nav_msgs::msg::OccupancyGrid::SharedPtr grid,
   computeCostmap();
 }
 
-double LocalCostmap::getCostAt(int idx) const { return costmap_[idx]; }
+double LocalCostmap::getCostAt(size_t idx) const { return costmap_[idx]; }
 
-double LocalCostmap::getCostAt(int local_x, int local_y) const {
+double LocalCostmap::getCostAt(size_t local_x, size_t local_y) const {
   return costmap_[localIndex(local_x, local_y)];
 }
 
 double LocalCostmap::getCostAtWorld(double world_x, double world_y) const {
   auto [local_x, local_y] = worldToMapDiscrete(world_x, world_y);
 
-  if (local_x < 0 || local_x >= window_width_ || local_y < 0 ||
-      local_y >= window_height_) {
+  if (local_x >= window_width_ || local_y >= window_height_)
     return -1.0;
-  }
 
   return getCostAt(local_x, local_y);
 }
@@ -96,32 +94,30 @@ double LocalCostmap::getDistanceAt(int idx) const {
   return edt_->getDistanceAt(idx);
 }
 
-double LocalCostmap::getDistanceAt(int local_x, int local_y) const {
+double LocalCostmap::getDistanceAt(size_t local_x, size_t local_y) const {
   return edt_->getDistanceAt(localIndex(local_x, local_y));
 }
 
 double LocalCostmap::getDistanceAtWorld(double world_x, double world_y) const {
   auto [local_x, local_y] = worldToMapDiscrete(world_x, world_y);
 
-  if (local_x < 0 || local_x >= window_width_ || local_y < 0 ||
-      local_y >= window_height_) {
+  if (local_x >= window_width_ || local_y >= window_height_)
     return -1.0;
-  }
 
   return getDistanceAt(local_x, local_y);
 }
 
-double LocalCostmap::getWindowWidth() const { return window_width_; }
-double LocalCostmap::getWindowHeight() const { return window_height_; }
+size_t LocalCostmap::getWindowWidth() const { return window_width_; }
+size_t LocalCostmap::getWindowHeight() const { return window_height_; }
 double LocalCostmap::getWindowOriginX() const { return window_origin_x_; }
 double LocalCostmap::getWindowOriginY() const { return window_origin_y_; }
 
 void LocalCostmap::computeCostmap() {
-  int size = window_width_ * window_height_;
-  for (int i = 0; i < size; i++) {
-    int global_x = global_offset_x_ + (i % window_width_);
-    int global_y = global_offset_y_ + (i / window_width_);
-    int global_idx = global_y * width_ + global_x;
+  size_t size = window_width_ * window_height_;
+  for (size_t i = 0; i < size; i++) {
+    size_t global_x = global_offset_x_ + (i % window_width_);
+    size_t global_y = global_offset_y_ + (i / window_width_);
+    size_t global_idx = global_y * width_ + global_x;
 
     double dist = edt_->getDistanceAt(global_idx);
     if (!std::isfinite(dist)) {
@@ -129,8 +125,8 @@ void LocalCostmap::computeCostmap() {
       continue;
     }
 
-    int idx = static_cast<int>(dist * COST_PRECISION + 0.5);
-    if (idx >= static_cast<int>(dist_to_cost_.size())) {
+    size_t idx = static_cast<int>(dist * COST_PRECISION + 0.5);
+    if (idx >= dist_to_cost_.size()) {
       costmap_[i] = 0.0;
       continue;
     }
@@ -151,17 +147,18 @@ double LocalCostmap::computeCost(double dist) {
 }
 
 void LocalCostmap::computeDistToCostMap() {
-  const int max_grid_dist_scaled =
-      static_cast<int>((inflation_radius_ / resolution_) * COST_PRECISION) + 1;
+  const size_t max_grid_dist_scaled =
+      static_cast<size_t>((inflation_radius_ / resolution_) * COST_PRECISION) +
+      1;
   dist_to_cost_.resize(max_grid_dist_scaled + 1);
 
-  for (int i = 0; i <= max_grid_dist_scaled; i++) {
+  for (size_t i = 0; i <= max_grid_dist_scaled; i++) {
     double dist = static_cast<double>(i) / COST_PRECISION;
     dist_to_cost_[i] = computeCost(dist);
   }
 }
 
-int LocalCostmap::localIndex(int local_x, int local_y) const {
+size_t LocalCostmap::localIndex(size_t local_x, size_t local_y) const {
   return local_y * window_width_ + local_x;
 }
 

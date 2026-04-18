@@ -48,9 +48,9 @@ void GlobalCostmap::setParameters(nav_msgs::msg::OccupancyGrid::SharedPtr grid,
   computeCostmap();
 }
 
-double GlobalCostmap::getCostAt(int idx) const { return costmap_[idx]; }
+double GlobalCostmap::getCostAt(size_t idx) const { return costmap_[idx]; }
 
-double GlobalCostmap::getCostAt(int x, int y) const {
+double GlobalCostmap::getCostAt(size_t x, size_t y) const {
   return costmap_[getIndex(x, y)];
 }
 
@@ -64,9 +64,9 @@ void GlobalCostmap::computeCostmap() {
       continue;
     }
 
-    int idx = static_cast<int>(dist * COST_PRECISION + 0.5);
+    size_t idx = static_cast<int>(dist * COST_PRECISION + 0.5);
 
-    if (idx >= static_cast<int>(dist_to_cost_.size())) {
+    if (idx >= dist_to_cost_.size()) {
       costmap_[i] = 0.0;
       continue;
     }
@@ -88,11 +88,11 @@ double GlobalCostmap::computeCost(double dist) {
 }
 
 void GlobalCostmap::computeDistToCostMap() {
-  const int max_grid_dist_scaled_ =
+  const size_t max_grid_dist_scaled_ =
       (inflation_radius_ / resolution_) * COST_PRECISION + 1;
   dist_to_cost_.resize(max_grid_dist_scaled_ + 1);
 
-  for (int i = 0; i <= max_grid_dist_scaled_; i++) {
+  for (size_t i = 0; i <= max_grid_dist_scaled_; i++) {
     double dist = static_cast<double>(i) / COST_PRECISION;
     dist_to_cost_[i] = computeCost(dist);
   }

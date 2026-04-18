@@ -29,19 +29,19 @@ bool CollisionChecker::inCollision(Pose2d robot_pose) const {
   auto [rx, ry] =
       global_costmap_->worldToMapDiscrete(robot_pose.x, robot_pose.y);
 
-  int half_w = robot_width_pixels_ / 2;
-  int half_h = robot_height_pixels_ / 2;
+  size_t half_w = robot_width_pixels_ / 2;
+  size_t half_h = robot_height_pixels_ / 2;
 
-  int size_x = global_costmap_->getWidth();
-  int size_y = global_costmap_->getHeight();
+  size_t size_x = global_costmap_->getWidth();
+  size_t size_y = global_costmap_->getHeight();
 
-  int min_x = std::max(0, rx - half_w);
-  int max_x = std::min(size_x - 1, rx + half_w);
-  int min_y = std::max(0, ry - half_h);
-  int max_y = std::min(size_y - 1, ry + half_h);
+  size_t min_x = std::max(0UL, rx - half_w);
+  size_t max_x = std::min(size_x - 1, rx + half_w);
+  size_t min_y = std::max(0UL, ry - half_h);
+  size_t max_y = std::min(size_y - 1, ry + half_h);
 
-  for (int x = min_x; x <= max_x; x++) {
-    for (int y = min_y; y <= max_y; y++) {
+  for (size_t x = min_x; x <= max_x; x++) {
+    for (size_t y = min_y; y <= max_y; y++) {
       auto cost = global_costmap_->getCostAt(x, y);
 
       if (cost == grid::GlobalCostmap::LETHAL_COST ||

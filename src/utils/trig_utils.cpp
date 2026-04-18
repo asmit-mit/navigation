@@ -3,12 +3,12 @@
 
 namespace utils {
 
-TrigTable::TrigTable(int precision)
+TrigTable::TrigTable(size_t precision)
     : size(precision), step(TWO_PI / precision), inv_step(precision / TWO_PI) {
   sin_table.resize(size);
   cos_table.resize(size);
 
-  for (int i = 0; i < size; ++i) {
+  for (size_t i = 0; i < size; ++i) {
     double angle = i * step;
     sin_table[i] = std::sin(angle);
     cos_table[i] = std::cos(angle);

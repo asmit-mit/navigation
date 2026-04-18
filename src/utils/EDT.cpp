@@ -7,15 +7,15 @@ namespace utils {
 EDT::EDT() {}
 
 void EDT::computeDT(nav_msgs::msg::OccupancyGrid::SharedPtr grid) {
-  const int size = grid->data.size();
-  const int height = grid->info.height;
-  const int width = grid->info.width;
+  const size_t size = grid->data.size();
+  const size_t height = grid->info.height;
+  const size_t width = grid->info.width;
 
   distance_transform_.resize(size);
 
   int obstacle_count = 0;
 
-  for (int i = 0; i < size; i++) {
+  for (size_t i = 0; i < size; i++) {
     if (grid->data[i] == 100) {
       distance_transform_[i] = 0;
       obstacle_count++;
@@ -26,19 +26,19 @@ void EDT::computeDT(nav_msgs::msg::OccupancyGrid::SharedPtr grid) {
   if (obstacle_count == 0)
     return;
 
-  for (int y = 0; y < height; y++)
+  for (size_t y = 0; y < height; y++)
     computeDT1D(y * width, width, 1);
 
-  for (int x = 0; x < width; x++)
+  for (size_t x = 0; x < width; x++)
     computeDT1D(x, height, width);
 
-  for (int i = 0; i < size; i++)
+  for (size_t i = 0; i < size; i++)
     distance_transform_[i] = std::sqrt(distance_transform_[i]);
 }
 
-double EDT::getDistanceAt(int idx) const { return distance_transform_[idx]; }
+double EDT::getDistanceAt(size_t idx) const { return distance_transform_[idx]; }
 
-void EDT::computeDT1D(int start, int size, int stride) {
+void EDT::computeDT1D(size_t start, size_t size, size_t stride) {
   std::vector<int> v(size);
   std::vector<double> z(size + 1);
 
@@ -51,7 +51,7 @@ void EDT::computeDT1D(int start, int size, int stride) {
     return distance_transform_[start + q * stride];
   };
 
-  for (int q = 1; q < size; q++) {
+  for (int q = 1; q < (int)size; q++) {
     double s;
 
     while (true) {
@@ -76,7 +76,7 @@ void EDT::computeDT1D(int start, int size, int stride) {
   }
 
   k = 0;
-  for (int q = 0; q < size; q++) {
+  for (int q = 0; q < (int)size; q++) {
     while (z[k + 1] < q) {
       k++;
     }
