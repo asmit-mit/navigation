@@ -2,6 +2,7 @@
 #include <cmath>
 #include <vector>
 
+#include "geometry/collison_checker.h"
 #include "geometry/pose.h"
 #include "geometry/state.h"
 #include "grid/global_costmap.h"
@@ -19,6 +20,7 @@ public:
 
   void setParameters(const grid::GlobalCostmap *costmap,
                      const Optimizer *optimizer, MotionModel *motion_mode_,
+                     const geometry::CollisionChecker *collision_checker,
                      const utils::TrigTable *trig_table,
                      const HybridAstarParams &params);
   void setStart(double x, double y, double theta);
@@ -67,7 +69,6 @@ private:
   double max_linear_velocity_, max_angular_velocity_;
 
   double expand_step_;
-  double expand_ds_;
 
   double analytical_expansion_ratio_;
   double analytical_expansion_max_length_;
@@ -88,13 +89,13 @@ private:
   static constexpr int dx_[8] = {-1, 1, -1, 0, 1, -1, 0, 1};
   static constexpr int dy_[8] = {0, 0, 1, 1, 1, -1, -1, -1};
 
-  static constexpr int num_samples_ = 5;
   static constexpr double epsilon_ = 1e-6;
   static constexpr double theta_to_deg_ = 180.0 / M_PI;
 
   const grid::GlobalCostmap *costmap_;
   const utils::TrigTable *trig_table_;
   const Optimizer *optimizer_;
+  const geometry::CollisionChecker *collision_checker_;
   MotionModel *motion_model_;
 
   utils::GenVector<double> holonomic_with_obstacle_cost_;

@@ -14,12 +14,13 @@ public:
 
   double getDistanceAt(int idx) const;
 
+public:
+  static constexpr double INF = std::numeric_limits<double>::infinity();
+
 private:
   void computeDT1D(int start, int size, int stride);
 
 private:
-  static constexpr double INF = std::numeric_limits<double>::infinity();
-
   std::vector<double> distance_transform_;
 };
 

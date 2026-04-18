@@ -19,11 +19,15 @@ GlobalCostmap::GlobalCostmap() {
 };
 
 void GlobalCostmap::setParameters(nav_msgs::msg::OccupancyGrid::SharedPtr grid,
-                                  const utils::EDT *edt, double radius,
+                                  const utils::EDT *edt,
+                                  double inflation_radius,
+                                  double inscribed_radius,
                                   double scaling_factor) {
-  assert(radius > epsilon_);
+  assert(grid != nullptr);
+  assert(edt != nullptr);
+  assert(inflation_radius > epsilon_);
+  assert(inscribed_radius > epsilon_);
   assert(scaling_factor > epsilon_);
-  assert(downsample_factor >= 1);
 
   edt_ = edt;
   grid_ = grid;
@@ -33,10 +37,10 @@ void GlobalCostmap::setParameters(nav_msgs::msg::OccupancyGrid::SharedPtr grid,
   origin_x_ = grid->info.origin.position.x;
   origin_y_ = grid->info.origin.position.y;
 
-  costmap_.resize(height_ * width_);
+  costmap_.resize(height_ * width_, 0.0);
 
-  inflation_radius_ = radius;
-  inscribed_radius_ = 0.2;
+  inflation_radius_ = inflation_radius;
+  inscribed_radius_ = inscribed_radius;
 
   scaling_factor_ = scaling_factor;
 
@@ -55,6 +59,10 @@ void GlobalCostmap::computeCostmap() {
 
   for (int i = 0; i < size; i++) {
     double dist = edt_->getDistanceAt(i);
+    if (!std::isfinite(dist)) {
+      costmap_[i] = 0.0;
+      continue;
+    }
 
     int idx = static_cast<int>(dist * COST_PRECISION + 0.5);
 

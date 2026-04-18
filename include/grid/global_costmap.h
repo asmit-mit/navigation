@@ -12,8 +12,8 @@ public:
   GlobalCostmap();
 
   void setParameters(nav_msgs::msg::OccupancyGrid::SharedPtr grid,
-                     const utils::EDT *edt, double radius,
-                     double scaling_factor);
+                     const utils::EDT *edt, double inflation_radius,
+                     double inscribed_radius, double scaling_factor);
 
   double getCostAt(int idx) const;
   double getCostAt(int x, int y) const;

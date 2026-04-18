@@ -13,8 +13,18 @@ void EDT::computeDT(nav_msgs::msg::OccupancyGrid::SharedPtr grid) {
 
   distance_transform_.resize(size);
 
-  for (int i = 0; i < size; i++)
-    distance_transform_[i] = (grid->data[i] == 100) ? 0 : INF;
+  int obstacle_count = 0;
+
+  for (int i = 0; i < size; i++) {
+    if (grid->data[i] == 100) {
+      distance_transform_[i] = 0;
+      obstacle_count++;
+    } else
+      distance_transform_[i] = INF;
+  }
+
+  if (obstacle_count == 0)
+    return;
 
   for (int y = 0; y < height; y++)
     computeDT1D(y * width, width, 1);

@@ -28,8 +28,13 @@ LocalCostmap::LocalCostmap() {
 void LocalCostmap::setParameters(nav_msgs::msg::OccupancyGrid::SharedPtr grid,
                                  const utils::EDT *edt, double robot_x,
                                  double robot_y, double window_size,
-                                 double radius, double scaling_factor) {
-  assert(radius > epsilon_);
+                                 double inflation_radius,
+                                 double inscribed_radius,
+                                 double scaling_factor) {
+  assert(grid != nullptr);
+  assert(edt != nullptr);
+  assert(inflation_radius > epsilon_);
+  assert(inscribed_radius > epsilon_);
   assert(scaling_factor > epsilon_);
   assert(window_size > epsilon_);
 
@@ -41,8 +46,8 @@ void LocalCostmap::setParameters(nav_msgs::msg::OccupancyGrid::SharedPtr grid,
   origin_x_ = grid->info.origin.position.x;
   origin_y_ = grid->info.origin.position.y;
 
-  inflation_radius_ = radius;
-  inscribed_radius_ = 0.1;
+  inflation_radius_ = inflation_radius;
+  inscribed_radius_ = inscribed_radius;
   scaling_factor_ = scaling_factor;
 
   auto [center_cell_x, center_cell_y] = worldToMapDiscrete(robot_x, robot_y);
@@ -119,6 +124,10 @@ void LocalCostmap::computeCostmap() {
     int global_idx = global_y * width_ + global_x;
 
     double dist = edt_->getDistanceAt(global_idx);
+    if (!std::isfinite(dist)) {
+      costmap_[i] = 0.0;
+      continue;
+    }
 
     int idx = static_cast<int>(dist * COST_PRECISION + 0.5);
     if (idx >= static_cast<int>(dist_to_cost_.size())) {

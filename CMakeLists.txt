@@ -25,6 +25,7 @@ add_executable(navigation
 
   src/geometry/pose.cpp
   src/geometry/state.cpp
+  src/geometry/collision_checker.cpp
 
   src/planner/hybrid_astar.cpp
   src/planner/reed_shepps.cpp

@@ -13,7 +13,8 @@ public:
 
   void setParameters(nav_msgs::msg::OccupancyGrid::SharedPtr grid,
                      const utils::EDT *edt, double robot_x, double robot_y,
-                     double window_size, double radius, double scaling_factor);
+                     double window_size, double inflation_radius,
+                     double inscribed_radius, double scaling_factor);
 
   double getWindowWidth() const;
   double getWindowHeight() const;

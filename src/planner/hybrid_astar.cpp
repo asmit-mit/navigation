@@ -29,19 +29,21 @@ bool HybridAStar::CompareNode::operator()(Node *a, Node *b) {
 
 HybridAStar::HybridAStar() {}
 
-void HybridAStar::setParameters(const grid::GlobalCostmap *costmap,
-                                const Optimizer *optimizer,
-                                MotionModel *motion_model,
-                                const utils::TrigTable *trig_table,
-                                const HybridAstarParams &params) {
+void HybridAStar::setParameters(
+    const grid::GlobalCostmap *costmap, const Optimizer *optimizer,
+    MotionModel *motion_model,
+    const geometry::CollisionChecker *collision_checker,
+    const utils::TrigTable *trig_table, const HybridAstarParams &params) {
   assert(costmap != nullptr);
   assert(optimizer != nullptr);
   assert(motion_model != nullptr);
   assert(trig_table != nullptr);
+  assert(collision_checker != nullptr);
 
   costmap_ = costmap;
   optimizer_ = optimizer;
   motion_model_ = motion_model;
+  collision_checker_ = collision_checker;
   trig_table_ = trig_table;
 
   controls_count_ =
@@ -52,7 +54,6 @@ void HybridAStar::setParameters(const grid::GlobalCostmap *costmap,
   map_resolution_ = costmap_->getResolution();
 
   expand_step_ = 1.41421356 * map_resolution_;
-  expand_ds_ = expand_step_ / num_samples_;
 
   // velocities
   max_angular_velocity_ = params.max_angular_velocity;
@@ -312,30 +313,12 @@ HybridAStar::analyticalExpansion(const Node *node) {
   if (mm_path.empty())
     return {};
 
-  for (size_t i = 1; i < mm_path.size(); ++i) {
-    const geometry::Pose2d &p0 = mm_path[i - 1];
-    const geometry::Pose2d &p1 = mm_path[i];
-    const geometry::Pose2d d = p1 - p0;
+  for (size_t i = 0; i < mm_path.size(); ++i) {
+    const geometry::Pose2d &p = mm_path[i];
 
-    if (i == 1) {
-      const geometry::State2d s0 = pose2dToState2d(p0);
-      if (!costmap_->isValid(s0.x, s0.y) ||
-          costmap_->getCostAt(s0.x, s0.y) >= expansion_cost_)
-        return {};
-    }
-
-    for (int j = 1; j <= num_samples_; ++j) {
-      const double t = static_cast<double>(j) / (num_samples_ + 1);
-      const geometry::Pose2d interp = p0 + d * t;
-      const geometry::State2d s_interp = pose2dToState2d(interp);
-      if (!costmap_->isValid(s_interp.x, s_interp.y) ||
-          costmap_->getCostAt(s_interp.x, s_interp.y) >= expansion_cost_)
-        return {};
-    }
-
-    const geometry::State2d s1 = pose2dToState2d(p1);
-    if (!costmap_->isValid(s1.x, s1.y) ||
-        costmap_->getCostAt(s1.x, s1.y) >= expansion_cost_)
+    const geometry::State2d s = pose2dToState2d(p);
+    if (collision_checker_->inCollision(p) ||
+        costmap_->getCostAt(s.x, s.y) >= expansion_cost_)
       return {};
   }
 
@@ -373,46 +356,36 @@ HybridAStar::expand(const Node *node) {
   for (int k = 0; k < controls_count_; k++) {
     auto [u, omega] = controls_[k];
     geometry::Pose3d temp = node->pose;
-    bool collision = false;
 
     const double dir = (u > 0) ? 1.0 : -1.0;
+    temp.x += expand_step_ * trig_table_->cos(temp.theta) * dir;
+    temp.y += expand_step_ * trig_table_->sin(temp.theta) * dir;
 
-    for (int i = 0; i < num_samples_; ++i) {
-      temp.x += expand_ds_ * trig_table_->cos(temp.theta) * dir;
-      temp.y += expand_ds_ * trig_table_->sin(temp.theta) * dir;
-
-      if (std::abs(omega) > epsilon_) {
-        double dtheta = omega * (expand_ds_ / std::abs(u));
-        temp.theta += dtheta;
-        temp.theta = utils::M(temp.theta);
-      }
-
-      auto [gx, gy] = costmap_->worldToMapDiscrete(temp.x, temp.y);
-      if (!costmap_->isValid(gx, gy)) {
-        collision = true;
-        break;
-      }
+    if (std::abs(omega) > epsilon_) {
+      double dtheta = omega * (expand_step_ / std::abs(u));
+      temp.theta += dtheta;
+      temp.theta = utils::M(temp.theta);
     }
 
-    if (!collision) {
-      double cost = expand_step_;
+    if (collision_checker_->inCollision(temp))
+      continue;
 
-      bool is_steering = std::abs(omega) > epsilon_;
-      bool parent_steering = std::abs(parent_omega) > epsilon_;
-      bool steering_changed = node->parent && is_steering && parent_steering &&
-                              (omega * parent_omega < 0.0);
+    double cost = expand_step_;
 
-      if (is_steering) {
-        cost *= steering_changed
-                    ? (steering_penalty_ * change_steering_penalty_)
-                    : steering_penalty_;
-      }
+    bool is_steering = std::abs(omega) > epsilon_;
+    bool parent_steering = std::abs(parent_omega) > epsilon_;
+    bool steering_changed = node->parent && is_steering && parent_steering &&
+                            (omega * parent_omega < 0.0);
 
-      if (u < 0.0)
-        cost *= reverse_penalty_;
-
-      neighbors.emplace_back(temp, cost);
+    if (is_steering) {
+      cost *= steering_changed ? (steering_penalty_ * change_steering_penalty_)
+                               : steering_penalty_;
     }
+
+    if (u < 0.0)
+      cost *= reverse_penalty_;
+
+    neighbors.emplace_back(temp, cost);
   }
 
   return neighbors;

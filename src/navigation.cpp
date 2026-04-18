@@ -17,11 +17,14 @@
 
 #include "controller/parameters.h"
 #include "controller/regulated_pure_pursuit.h"
+#include "geometry/collison_checker.h"
+#include "geometry/pose.h"
 #include "grid/global_costmap.h"
 #include "grid/local_costmap.h"
 #include "planner/hybrid_astar.h"
 #include "planner/motion_model.h"
 #include "planner/optimizer.h"
+#include "utils/math_utils.h"
 #include "utils/trig_utils.h"
 
 using namespace std::placeholders;
@@ -121,7 +124,7 @@ private:
 
     edt_.computeDT(latest_map_);
 
-    global_costmap_.setParameters(latest_map_, &edt_, 0.55, 3.0);
+    global_costmap_.setParameters(latest_map_, &edt_, 0.55, 0.1, 3.0);
 
     int size = global_costmap_.getHeight() * global_costmap_.getWidth();
 
@@ -149,7 +152,7 @@ private:
     double start_y = start_pose_.pose.position.y;
 
     local_costmap_.setParameters(latest_map_, &edt_, start_x, start_y, 3.0, 1.0,
-                                 3.0);
+                                 0.1, 3.0);
 
     int local_size =
         local_costmap_.getWindowWidth() * local_costmap_.getWindowHeight();
@@ -178,6 +181,8 @@ private:
     if (!latest_map_ || !have_start_ || !have_goal_)
       return;
 
+    collision_checker_.setParameters(&global_costmap_, 0.1);
+
     double roll, pitch;
     start_x_ = start_pose_.pose.position.x;
     start_y_ = start_pose_.pose.position.y;
@@ -202,14 +207,15 @@ private:
 
     motion_model_.setTrigTable(&trig_table_);
     motion_model_.setMotionModel(planner::MotionModelType::DUBINS);
-    motion_model_.setDistanceResolution(global_costmap_.getResolution());
+    motion_model_.setDistanceResolution(1.41421356 *
+                                        global_costmap_.getResolution());
     motion_model_.setMinTurningRadius(0.5 / 1.0);
     motion_model_.setTolerance(0.5, 0.2);
 
     planner::HybridAstarParams planner_params;
     planner_params.max_linear_velocity = 0.5;
     planner_params.max_angular_velocity = 1.0;
-    planner_params.distance_tolerance = 0.5;
+    planner_params.distance_tolerance = 0.2;
     planner_params.angular_tolerance = 0.2;
     planner_params.angular_resolution = 5;
     planner_params.reverse_penalty = 2.1;
@@ -218,7 +224,7 @@ private:
     planner_params.cost_penalty = 6.0;
 
     planner_.setParameters(&global_costmap_, &optimizer_, &motion_model_,
-                           &trig_table_, planner_params);
+                           &collision_checker_, &trig_table_, planner_params);
     planner_.setStart(start_x_, start_y_, start_theta_);
     planner_.setGoal(goal_x_, goal_y_, goal_theta_);
 
@@ -270,13 +276,16 @@ private:
     controller::ControllerParams controller_params;
     controller_params.max_linear_velocity = 0.5;
     controller_params.max_angular_velocity = 1.0;
-    controller_params.distance_tolerance = 0.001;
+    controller_params.distance_tolerance = 0.1;
 
     controller_.setParameters(&local_costmap_, &trig_table_, controller_params);
 
     auto [v, w] = controller_.computeCommand(
         geometry::Pose3d(start_x_, start_y_, start_theta_), linear_velocity_,
         path_);
+    RCLCPP_INFO(
+        get_logger(), "Distance to goal: %f",
+        utils::distance(geometry::Pose2d(start_x_, start_y_), path_.back()));
     RCLCPP_INFO(get_logger(), "Publishing v: %f and w: %f", v, w);
 
     geometry::Pose2d lookahead_point = controller_.getLookaheadPoint();
@@ -350,6 +359,7 @@ private:
   planner::HybridAStar planner_;
   planner::Optimizer optimizer_;
   planner::MotionModel motion_model_;
+  geometry::CollisionChecker collision_checker_;
   controller::RegulatedPurePursuit controller_;
 
   double start_x_, start_y_, start_theta_;
