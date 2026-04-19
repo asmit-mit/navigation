@@ -18,9 +18,14 @@ public:
                      controller::ControllerParams &params);
 
   std::pair<double, double>
-  computeCommand(const geometry::Pose3d &curr_pose, double linear_velocity,
+  computeCommand(const geometry::Pose3d &curr_pose,
+                 const geometry::Pose3d &goal_pose, double linear_velocity,
+                 double angular_velocity,
                  const std::vector<geometry::Pose2d> &plan);
   geometry::Pose2d getLookaheadPoint();
+
+  bool goalReached(const geometry::Pose3d &curr_pose,
+                   const geometry::Pose2d &end) const;
 
 private:
   geometry::Pose2d findLookaheadPoint(const geometry::Pose3d &curr_pose,
@@ -34,13 +39,19 @@ private:
   double regulateByGoalProximity(double v, const geometry::Pose3d &curr_pose,
                                  const std::vector<geometry::Pose2d> &plan);
 
-  bool goalReached(const geometry::Pose3d &curr_pose,
-                   const geometry::Pose2d &end) const;
+  double angleToTarget(const geometry::Pose3d &curr_pose,
+                       const geometry::Pose2d &target);
+  bool shouldRotateToGoalHeading(const geometry::Pose3d &curr_pose,
+                                 const geometry::Pose2d &goal) const;
+
+  std::pair<double, double> rotateToHeading(double angle_to_lookahead,
+                                            double angular_velocity);
   double computeLookaheadDistance(double linear_velocity);
 
 private:
   double max_linear_velocity_;
   double max_angular_velocity_;
+  double max_angular_acceleration_;
 
   double lookahead_distance_;
   double lookahead_gain_;
@@ -52,11 +63,14 @@ private:
 
   double approach_velocity_scaling_dist_;
   double min_approach_linear_velocity_;
+  double min_heading_angle_error_;
 
   double distance_tolerance_;
 
   double min_turning_radius_;
   double T_k_;
+
+  double control_duration_;
 
   static constexpr double epsilon_ = 1e-6;
 

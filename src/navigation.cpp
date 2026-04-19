@@ -68,7 +68,7 @@ public:
             "/lookahead_pose", 10);
 
     planner_timer_ = this->create_wall_timer(
-        500ms, std::bind(&Navigation::plannerCallback, this));
+        200ms, std::bind(&Navigation::plannerCallback, this));
 
     controller_timer_ = this->create_wall_timer(
         100ms, std::bind(&Navigation::controllerCallback, this));
@@ -87,35 +87,15 @@ private:
   void odomCallback(const nav_msgs::msg::Odometry::SharedPtr msg) {
     start_pose_.pose = msg->pose.pose;
     linear_velocity_ = msg->twist.twist.linear.x;
+    angular_velocity_ = msg->twist.twist.angular.z;
 
     have_start_ = true;
-    // RCLCPP_INFO(this->get_logger(), "Updated start pose");
   }
 
   void goalCallback(const geometry_msgs::msg::PoseStamped::SharedPtr msg) {
-    // if (!have_start_) {
-    //   start_pose_ = *msg;
-    //   have_start_ = true;
-    //   RCLCPP_INFO(this->get_logger(), "Start pose received");
-    //   return;
-    // }
-
-    // if (!have_goal_) {
-    //   goal_pose_ = *msg;
-    //   have_goal_ = true;
-    //   RCLCPP_INFO(this->get_logger(), "Goal pose received");
-    //   return;
-    // }
-
-    // start_pose_ = goal_pose_;
-    // goal_pose_ = *msg;
-
-    // RCLCPP_INFO(this->get_logger(), "Updated start and goal");
-
     goal_pose_.pose = msg->pose;
 
     have_goal_ = true;
-    // RCLCPP_INFO(this->get_logger(), "Updated goal pose");
   }
 
   void costmapCallback() {
@@ -213,15 +193,15 @@ private:
     motion_model_.setTolerance(0.5, 0.2);
 
     planner::HybridAstarParams planner_params;
-    planner_params.max_linear_velocity = 0.5;
-    planner_params.max_angular_velocity = 1.0;
+    planner_params.max_linear_velocity = 0.9;
+    planner_params.max_angular_velocity = 1.8;
     planner_params.distance_tolerance = 0.2;
     planner_params.angular_tolerance = 0.2;
     planner_params.angular_resolution = 5;
     planner_params.reverse_penalty = 2.1;
-    planner_params.steering_penalty = 0.7;
-    planner_params.change_steering_penalty = 0.2;
-    planner_params.cost_penalty = 6.0;
+    planner_params.steering_penalty = 0.8;
+    planner_params.change_steering_penalty = 0.3;
+    planner_params.cost_penalty = 10.0;
 
     planner_.setParameters(&global_costmap_, &optimizer_, &motion_model_,
                            &collision_checker_, &trig_table_, planner_params);
@@ -274,15 +254,17 @@ private:
       return;
 
     controller::ControllerParams controller_params;
-    controller_params.max_linear_velocity = 0.5;
-    controller_params.max_angular_velocity = 1.0;
+    controller_params.max_linear_velocity = 0.9;
+    controller_params.max_angular_velocity = 1.8;
+    controller_params.max_angular_acceleration = 1.5;
     controller_params.distance_tolerance = 0.1;
 
     controller_.setParameters(&local_costmap_, &trig_table_, controller_params);
 
     auto [v, w] = controller_.computeCommand(
-        geometry::Pose3d(start_x_, start_y_, start_theta_), linear_velocity_,
-        path_);
+        geometry::Pose3d(start_x_, start_y_, start_theta_),
+        geometry::Pose3d(path_.back().x, path_.back().y, goal_theta_),
+        linear_velocity_, angular_velocity_, path_);
     RCLCPP_INFO(
         get_logger(), "Distance to goal: %f",
         utils::distance(geometry::Pose2d(start_x_, start_y_), path_.back()));
@@ -368,7 +350,7 @@ private:
   bool have_start_ = false;
   bool have_goal_ = false;
 
-  double linear_velocity_;
+  double linear_velocity_, angular_velocity_;
 };
 
 int main(int argc, char *argv[]) {
