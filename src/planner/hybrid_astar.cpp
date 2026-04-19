@@ -1,4 +1,5 @@
 #include "planner/hybrid_astar.h"
+#include "utils/grid_utils.h"
 #include "utils/math_utils.h"
 
 #include <cassert>
@@ -117,7 +118,9 @@ std::vector<geometry::Pose2d> HybridAStar::getPlan() {
 }
 
 geometry::State3d HybridAStar::poseToState(const geometry::Pose3d &p) {
-  auto [x, y] = costmap_->worldToMapDiscrete(p.x, p.y);
+  auto [x, y] = utils::worldToMapDiscrete(p.x, p.y, costmap_->getOriginX(),
+                                          costmap_->getOriginY(),
+                                          costmap_->getResolution());
 
   double theta_deg = p.theta * theta_to_deg_;
   theta_deg -= 360.0 * std::floor(theta_deg / 360.0);
@@ -128,11 +131,15 @@ geometry::State3d HybridAStar::poseToState(const geometry::Pose3d &p) {
 }
 
 geometry::State2d HybridAStar::pose2dToState2d(const geometry::Pose2d &p) {
-  return geometry::State2d(costmap_->worldToMapDiscrete(p.x, p.y));
+  return geometry::State2d(utils::worldToMapDiscrete(
+      p.x, p.y, costmap_->getOriginX(), costmap_->getOriginY(),
+      costmap_->getResolution()));
 }
 
 geometry::Pose2d HybridAStar::state2dToPose2d(const geometry::State2d &s) {
-  return geometry::Pose2d(costmap_->mapToWorld(s.x, s.y));
+  return geometry::Pose2d(utils::mapToWorld(s.x, s.y, costmap_->getOriginX(),
+                                            costmap_->getOriginY(),
+                                            costmap_->getResolution()));
 }
 
 size_t HybridAStar::getStateIndex(const geometry::State3d &state) const {
@@ -153,7 +160,9 @@ geometry::State2d HybridAStar::stateIndexToState2d(size_t index) const {
 void HybridAStar::buildObstacleCostTable() {
   holonomic_with_obstacle_cost_.reset();
 
-  const auto [start_x, start_y] = costmap_->worldToMapDiscrete(end_.x, end_.y);
+  const auto [start_x, start_y] = utils::worldToMapDiscrete(
+      end_.x, end_.y, costmap_->getOriginX(), costmap_->getOriginY(),
+      costmap_->getResolution());
 
   if (!costmap_->isValid(start_x, start_y))
     return;
@@ -317,7 +326,7 @@ HybridAStar::analyticalExpansion(const Node *node) {
     const geometry::Pose2d &p = mm_path[i];
 
     const geometry::State2d s = pose2dToState2d(p);
-    if (collision_checker_->inCollision(p) ||
+    if (collision_checker_->inCollisionGlobal(p) ||
         costmap_->getCostAt(s.x, s.y) >= expansion_cost_)
       return {};
   }
@@ -367,7 +376,7 @@ HybridAStar::expand(const Node *node) {
       temp.theta = utils::M(temp.theta);
     }
 
-    if (collision_checker_->inCollision(temp))
+    if (collision_checker_->inCollisionGlobal(temp))
       continue;
 
     double cost = expand_step_;

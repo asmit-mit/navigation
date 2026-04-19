@@ -1,5 +1,6 @@
 #include "grid/local_costmap.h"
 #include "utils/EDT.h"
+#include "utils/grid_utils.h"
 
 #include <algorithm>
 #include <assert.h>
@@ -50,7 +51,8 @@ void LocalCostmap::setParameters(nav_msgs::msg::OccupancyGrid::SharedPtr grid,
   inscribed_radius_ = inscribed_radius;
   scaling_factor_ = scaling_factor;
 
-  auto [center_cell_x, center_cell_y] = worldToMapDiscrete(robot_x, robot_y);
+  auto [center_cell_x, center_cell_y] = utils::worldToMapDiscrete(
+      robot_x, robot_y, origin_x_, origin_y_, resolution_);
 
   size_t half_cells =
       static_cast<int>(std::ceil((window_size / 2.0) / resolution_));
@@ -82,9 +84,11 @@ double LocalCostmap::getCostAt(size_t local_x, size_t local_y) const {
 }
 
 double LocalCostmap::getCostAtWorld(double world_x, double world_y) const {
-  auto [local_x, local_y] = worldToMapDiscrete(world_x, world_y);
+  auto [local_x, local_y] = utils::worldToMapDiscrete(
+      world_x, world_y, origin_x_, origin_x_, resolution_);
 
-  if (local_x >= window_width_ || local_y >= window_height_)
+  if (local_x < 0 || local_y < 0 || local_x >= (int)window_width_ ||
+      local_y >= (int)window_height_)
     return -1.0;
 
   return getCostAt(local_x, local_y);
@@ -99,9 +103,11 @@ double LocalCostmap::getDistanceAt(size_t local_x, size_t local_y) const {
 }
 
 double LocalCostmap::getDistanceAtWorld(double world_x, double world_y) const {
-  auto [local_x, local_y] = worldToMapDiscrete(world_x, world_y);
+  auto [local_x, local_y] = utils::worldToMapDiscrete(
+      world_x, world_y, origin_x_, origin_y_, resolution_);
 
-  if (local_x >= window_width_ || local_y >= window_height_)
+  if (local_x < 0 || local_y < 0 || local_x >= (int)window_width_ ||
+      local_y >= (int)window_height_)
     return -1.0;
 
   return getDistanceAt(local_x, local_y);

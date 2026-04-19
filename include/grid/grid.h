@@ -22,10 +22,6 @@ public:
   bool isValid(size_t x, size_t y) const;
   size_t getIndex(size_t x, size_t y) const;
 
-  std::pair<size_t, size_t> worldToMapDiscrete(double x, double y) const;
-  std::pair<double, double> worldToMapContinous(double x, double y) const;
-  std::pair<double, double> mapToWorld(double x, double y) const;
-
 protected:
   double resolution_;
   size_t height_, width_;

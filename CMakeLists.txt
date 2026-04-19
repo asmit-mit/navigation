@@ -13,6 +13,7 @@ find_package(nav_msgs REQUIRED)
 find_package(visualization_msgs REQUIRED)
 find_package(geometry_msgs REQUIRED)
 find_package(tf2 REQUIRED)
+find_package(tf2_ros REQUIRED)
 find_package(tf2_geometry_msgs REQUIRED)
 
 
@@ -38,6 +39,7 @@ add_executable(navigation
   src/utils/DSU.cpp
   src/utils/EDT.cpp
   src/utils/math_utils.cpp
+  src/utils/grid_utils.cpp
   src/utils/trig_utils.cpp)
 target_include_directories(navigation PUBLIC
   $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
@@ -50,6 +52,7 @@ ament_target_dependencies(
   geometry_msgs
   visualization_msgs
   tf2
+  tf2_ros
   tf2_geometry_msgs
 )
 install(TARGETS navigation

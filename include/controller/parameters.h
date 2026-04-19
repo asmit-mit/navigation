@@ -7,6 +7,7 @@ struct ControllerParams {
   double max_linear_velocity = 0.22;
   double max_angular_velocity = 1.0;
   double max_angular_acceleration = 3.2;
+  double sim_time = 1.0;
 
   double lookahead_distance = 0.6;
   double lookahead_gain = 1.5;

@@ -36,22 +36,4 @@ bool Grid::isValid(size_t x, size_t y) const {
 
 size_t Grid::getIndex(size_t x, size_t y) const { return y * width_ + x; }
 
-std::pair<size_t, size_t> Grid::worldToMapDiscrete(double x, double y) const {
-  size_t gx = floor((x - origin_x_) / resolution_);
-  size_t gy = floor((y - origin_y_) / resolution_);
-  return {gx, gy};
-}
-
-std::pair<double, double> Grid::worldToMapContinous(double x, double y) const {
-  double gx = (x - origin_x_) / resolution_;
-  double gy = (y - origin_y_) / resolution_;
-  return {gx, gy};
-}
-
-std::pair<double, double> Grid::mapToWorld(double x, double y) const {
-  double wx = x * resolution_ + origin_x_;
-  double wy = y * resolution_ + origin_y_;
-  return {wx, wy};
-}
-
 }; // namespace grid

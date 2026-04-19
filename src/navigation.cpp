@@ -10,9 +10,11 @@
 #include "nav_msgs/msg/odometry.hpp"
 #include "nav_msgs/msg/path.hpp"
 #include "rclcpp/rclcpp.hpp"
+#include "utils/grid_utils.h"
 #include "visualization_msgs/msg/marker.hpp"
+#include "visualization_msgs/msg/marker_array.hpp"
 
-#include "tf2/LinearMath/Matrix3x3.hpp"
+#include "tf2/utils.hpp"
 #include "tf2_geometry_msgs/tf2_geometry_msgs.hpp"
 
 #include "controller/parameters.h"
@@ -155,28 +157,29 @@ private:
 
     // RCLCPP_INFO(this->get_logger(), "Publishing Local Costmap");
     local_costmap_pub_->publish(local_costmap_msg_);
+
+    collision_checker_.setParameters(&global_costmap_, &local_costmap_, 0.13);
+
+    // if (collision_checker_.inCollisionGlobal(
+    //         geometry::Pose2d(start_x, start_y)))
+    //   RCLCPP_INFO(get_logger(), "In collision global map");
+    //
+    // if (collision_checker_.inCollisionLocal(
+    //         geometry::Pose2d(start_x, start_y)))
+    //   RCLCPP_INFO(get_logger(), "In collision local map");
   }
 
   void plannerCallback() {
     if (!latest_map_ || !have_start_ || !have_goal_)
       return;
 
-    collision_checker_.setParameters(&global_costmap_, 0.1);
-
-    double roll, pitch;
     start_x_ = start_pose_.pose.position.x;
     start_y_ = start_pose_.pose.position.y;
-
-    tf2::Quaternion q_start;
-    tf2::fromMsg(start_pose_.pose.orientation, q_start);
-    tf2::Matrix3x3(q_start).getRPY(roll, pitch, start_theta_);
+    start_theta_ = tf2::getYaw(start_pose_.pose.orientation);
 
     goal_x_ = goal_pose_.pose.position.x;
     goal_y_ = goal_pose_.pose.position.y;
-
-    tf2::Quaternion q_goal;
-    tf2::fromMsg(goal_pose_.pose.orientation, q_goal);
-    tf2::Matrix3x3(q_goal).getRPY(roll, pitch, goal_theta_);
+    goal_theta_ = tf2::getYaw(goal_pose_.pose.orientation);
 
     RCLCPP_INFO(this->get_logger(), "Start: %f %f", start_x_, start_y_);
     RCLCPP_INFO(this->get_logger(), "Goal: %f %f", goal_x_, goal_y_);
@@ -201,7 +204,7 @@ private:
     planner_params.reverse_penalty = 2.1;
     planner_params.steering_penalty = 0.8;
     planner_params.change_steering_penalty = 0.3;
-    planner_params.cost_penalty = 10.0;
+    planner_params.cost_penalty = 8.0;
 
     planner_.setParameters(&global_costmap_, &optimizer_, &motion_model_,
                            &collision_checker_, &trig_table_, planner_params);
@@ -236,10 +239,6 @@ private:
       pose_stamped.pose.position.y = pose.y;
       pose_stamped.pose.position.z = 0.0;
 
-      tf2::Quaternion q;
-      q.setRPY(0, 0, 0);
-      pose_stamped.pose.orientation = tf2::toMsg(q);
-
       ros_path.poses.push_back(pose_stamped);
     }
 
@@ -257,9 +256,11 @@ private:
     controller_params.max_linear_velocity = 0.9;
     controller_params.max_angular_velocity = 1.8;
     controller_params.max_angular_acceleration = 1.5;
+    controller_params.approach_velocity_scaling_dist = 1.0;
     controller_params.distance_tolerance = 0.1;
 
-    controller_.setParameters(&local_costmap_, &trig_table_, controller_params);
+    controller_.setParameters(&local_costmap_, &collision_checker_,
+                              &trig_table_, controller_params);
 
     auto [v, w] = controller_.computeCommand(
         geometry::Pose3d(start_x_, start_y_, start_theta_),
