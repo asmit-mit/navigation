@@ -1,6 +1,8 @@
 #include "controller/regulated_pure_pursuit.h"
 #include "utils/math_utils.h"
 
+#include <iostream>
+
 namespace controller {
 
 RegulatedPurePursuit::RegulatedPurePursuit() {}
@@ -45,7 +47,7 @@ std::pair<double, double> RegulatedPurePursuit::computeCommand(
     return rotateToHeading(angle_to_goal, angular_velocity);
   }
 
-  if (plan.empty() || goalReached(curr_pose, plan.back()))
+  if (plan.empty())
     return {0.0, 0.0};
 
   double lookahead_dist = computeLookaheadDistance(linear_velocity);
@@ -64,6 +66,11 @@ std::pair<double, double> RegulatedPurePursuit::computeCommand(
 
   double w = k * v;
   w = std::clamp(w, -max_angular_velocity_, max_angular_velocity_);
+
+  if (checkCollision(curr_pose, v, w, lookahead_dist)) {
+    std::cout << "Collision Detected\n";
+    return {linear_velocity, angular_velocity};
+  }
 
   return {v, w};
 }
@@ -182,31 +189,30 @@ bool RegulatedPurePursuit::shouldRotateToGoalHeading(
   return utils::distance(curr_pose, goal) < distance_tolerance_ * 2.0;
 }
 
-bool RegulatedPurePursuit::checkCollision(geometry::Pose3d &curr_pose,
+bool RegulatedPurePursuit::checkCollision(const geometry::Pose3d &curr_pose,
                                           double linear_velocity,
                                           double angular_velocity,
                                           double lookahead_dist) const {
   if (collision_checker_->inCollisionLocal(curr_pose))
     return true;
 
-  auto robot_pose = curr_pose;
+  geometry::Pose3d robot_pose = curr_pose;
 
-  double projection_time = 1.41421356 * costmap_->getResolution();
-  int i = 0;
-  while (i * projection_time < sim_time_) {
-    robot_pose.x +=
-        curr_pose.x * (linear_velocity * trig_table_->cos(robot_pose.theta));
-    robot_pose.y +=
-        curr_pose.y * (linear_velocity * trig_table_->sin(robot_pose.theta));
-    robot_pose.theta = projection_time * angular_velocity;
+  const double dt = 1.41421356 * costmap_->getResolution();
+
+  double t = 0.0;
+  while (t < sim_time_) {
+    robot_pose.x += linear_velocity * dt * trig_table_->cos(robot_pose.theta);
+    robot_pose.y += linear_velocity * dt * trig_table_->sin(robot_pose.theta);
+    robot_pose.theta += angular_velocity * dt;
 
     if (utils::distance(curr_pose, robot_pose) > lookahead_dist)
       break;
 
-    if (collision_checker_->inCollisionLocal(curr_pose))
+    if (collision_checker_->inCollisionLocal(robot_pose))
       return true;
 
-    i++;
+    t += dt;
   }
 
   return false;

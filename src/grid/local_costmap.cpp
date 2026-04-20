@@ -85,7 +85,7 @@ double LocalCostmap::getCostAt(size_t local_x, size_t local_y) const {
 
 double LocalCostmap::getCostAtWorld(double world_x, double world_y) const {
   auto [local_x, local_y] = utils::worldToMapDiscrete(
-      world_x, world_y, origin_x_, origin_x_, resolution_);
+      world_x, world_y, window_origin_x_, window_origin_y_, resolution_);
 
   if (local_x < 0 || local_y < 0 || local_x >= (int)window_width_ ||
       local_y >= (int)window_height_)
@@ -94,17 +94,17 @@ double LocalCostmap::getCostAtWorld(double world_x, double world_y) const {
   return getCostAt(local_x, local_y);
 }
 
-double LocalCostmap::getDistanceAt(int idx) const {
-  return edt_->getDistanceAt(idx);
-}
-
 double LocalCostmap::getDistanceAt(size_t local_x, size_t local_y) const {
-  return edt_->getDistanceAt(localIndex(local_x, local_y));
+  size_t global_x = global_offset_x_ + local_x;
+  size_t global_y = global_offset_y_ + local_y;
+  size_t global_idx = global_y * width_ + global_x;
+
+  return edt_->getDistanceAt(global_idx) * resolution_;
 }
 
 double LocalCostmap::getDistanceAtWorld(double world_x, double world_y) const {
   auto [local_x, local_y] = utils::worldToMapDiscrete(
-      world_x, world_y, origin_x_, origin_y_, resolution_);
+      world_x, world_y, window_origin_x_, window_origin_y_, resolution_);
 
   if (local_x < 0 || local_y < 0 || local_x >= (int)window_width_ ||
       local_y >= (int)window_height_)

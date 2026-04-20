@@ -25,7 +25,6 @@ public:
   double getCostAt(size_t local_x, size_t local_y) const;
   double getCostAtWorld(double world_x, double world_y) const;
 
-  double getDistanceAt(int idx) const;
   double getDistanceAt(size_t local_x, size_t local_y) const;
   double getDistanceAtWorld(double world_x, double world_y) const;
 

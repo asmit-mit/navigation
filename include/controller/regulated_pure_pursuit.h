@@ -46,7 +46,7 @@ private:
                        const geometry::Pose2d &target) const;
   bool shouldRotateToGoalHeading(const geometry::Pose3d &curr_pose,
                                  const geometry::Pose2d &goal) const;
-  bool checkCollision(geometry::Pose3d &curr_pose, double linear_velocity,
+  bool checkCollision(const geometry::Pose3d &curr_pose, double linear_velocity,
                       double angular_velocity,
                       double lookahead_dist) const;
 

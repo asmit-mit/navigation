@@ -44,41 +44,41 @@ public:
     map_qos.transient_local();
     map_qos.reliable();
 
-    map_sub_ = this->create_subscription<nav_msgs::msg::OccupancyGrid>(
+    map_sub_ = create_subscription<nav_msgs::msg::OccupancyGrid>(
         "/map", map_qos, std::bind(&Navigation::mapCallback, this, _1));
 
-    goal_sub_ = this->create_subscription<geometry_msgs::msg::PoseStamped>(
+    goal_sub_ = create_subscription<geometry_msgs::msg::PoseStamped>(
         "/goal_pose", 10, std::bind(&Navigation::goalCallback, this, _1));
 
-    odom_sub_ = this->create_subscription<nav_msgs::msg::Odometry>(
+    odom_sub_ = create_subscription<nav_msgs::msg::Odometry>(
         "/odom", 10, std::bind(&Navigation::odomCallback, this, _1));
 
     cmd_vel_pub_ =
-        this->create_publisher<geometry_msgs::msg::Twist>("/cmd_vel", 10);
+        create_publisher<geometry_msgs::msg::Twist>("/cmd_vel", 10);
 
     path_pub_ =
-        this->create_publisher<nav_msgs::msg::Path>("/hybrid_astar_path", 10);
+        create_publisher<nav_msgs::msg::Path>("/hybrid_astar_path", 10);
 
-    global_costmap_pub_ = this->create_publisher<nav_msgs::msg::OccupancyGrid>(
+    global_costmap_pub_ = create_publisher<nav_msgs::msg::OccupancyGrid>(
         "/global_costmap", 10);
 
-    local_costmap_pub_ = this->create_publisher<nav_msgs::msg::OccupancyGrid>(
+    local_costmap_pub_ = create_publisher<nav_msgs::msg::OccupancyGrid>(
         "/local_costmap", 10);
 
     lookahead_pose_pub_ =
-        this->create_publisher<visualization_msgs::msg::Marker>(
+        create_publisher<visualization_msgs::msg::Marker>(
             "/lookahead_pose", 10);
 
-    planner_timer_ = this->create_wall_timer(
+    planner_timer_ = create_wall_timer(
         200ms, std::bind(&Navigation::plannerCallback, this));
 
-    controller_timer_ = this->create_wall_timer(
+    controller_timer_ = create_wall_timer(
         100ms, std::bind(&Navigation::controllerCallback, this));
 
-    costmap_timer_ = this->create_wall_timer(
+    costmap_timer_ = create_wall_timer(
         200ms, std::bind(&Navigation::costmapCallback, this));
 
-    RCLCPP_INFO(this->get_logger(), "navigation node started");
+    RCLCPP_INFO(get_logger(), "navigation node started");
   }
 
 private:
@@ -124,7 +124,7 @@ private:
       }
     }
 
-    // RCLCPP_INFO(this->get_logger(), "Publishing Global Costmap");
+    // RCLCPP_INFO(get_logger(), "Publishing Global Costmap");
     global_costmap_pub_->publish(global_costmap_msg_);
 
     if (!have_start_)
@@ -155,10 +155,13 @@ private:
           static_cast<int8_t>(std::min(100.0, c / 2.55));
     }
 
-    // RCLCPP_INFO(this->get_logger(), "Publishing Local Costmap");
+    // RCLCPP_INFO(get_logger(), "Publishing Local Costmap");
     local_costmap_pub_->publish(local_costmap_msg_);
 
-    collision_checker_.setParameters(&global_costmap_, &local_costmap_, 0.13);
+    collision_checker_.setParameters(&global_costmap_, &local_costmap_, 0.12);
+
+    // RCLCPP_INFO(get_logger(), "Distance to obstacle: %lf",
+    //             local_costmap_.getDistanceAtWorld(start_x, start_y));
 
     // if (collision_checker_.inCollisionGlobal(
     //         geometry::Pose2d(start_x, start_y)))
@@ -181,8 +184,8 @@ private:
     goal_y_ = goal_pose_.pose.position.y;
     goal_theta_ = tf2::getYaw(goal_pose_.pose.orientation);
 
-    RCLCPP_INFO(this->get_logger(), "Start: %f %f", start_x_, start_y_);
-    RCLCPP_INFO(this->get_logger(), "Goal: %f %f", goal_x_, goal_y_);
+    // RCLCPP_INFO(get_logger(), "Start: %f %f", start_x_, start_y_);
+    // RCLCPP_INFO(get_logger(), "Goal: %f %f", goal_x_, goal_y_);
 
     optimizer_.setCostmap(&global_costmap_);
     optimizer_.setIterations(1000);
@@ -196,39 +199,39 @@ private:
     motion_model_.setTolerance(0.5, 0.2);
 
     planner::HybridAstarParams planner_params;
-    planner_params.max_linear_velocity = 0.9;
-    planner_params.max_angular_velocity = 1.8;
+    planner_params.max_linear_velocity = 0.8;
+    planner_params.max_angular_velocity = 2.0;
     planner_params.distance_tolerance = 0.2;
     planner_params.angular_tolerance = 0.2;
     planner_params.angular_resolution = 5;
     planner_params.reverse_penalty = 2.1;
     planner_params.steering_penalty = 0.8;
     planner_params.change_steering_penalty = 0.3;
-    planner_params.cost_penalty = 8.0;
+    planner_params.cost_penalty = 12.0;
 
     planner_.setParameters(&global_costmap_, &optimizer_, &motion_model_,
                            &collision_checker_, &trig_table_, planner_params);
     planner_.setStart(start_x_, start_y_, start_theta_);
     planner_.setGoal(goal_x_, goal_y_, goal_theta_);
 
-    auto start = std::chrono::steady_clock::now();
+    // auto start = std::chrono::steady_clock::now();
 
     path_ = planner_.getPlan();
 
-    auto end = std::chrono::steady_clock::now();
+    // auto end = std::chrono::steady_clock::now();
 
-    double time_ms =
-        std::chrono::duration<double, std::milli>(end - start).count();
+    // double time_ms =
+    //     std::chrono::duration<double, std::milli>(end - start).count();
 
-    RCLCPP_INFO(get_logger(), "Planning time: %f ms", time_ms);
+    // RCLCPP_INFO(get_logger(), "Planning time: %f ms", time_ms);
 
     if (path_.empty()) {
-      RCLCPP_WARN(this->get_logger(), "No path found");
+      RCLCPP_WARN(get_logger(), "No path found");
       return;
     }
 
     nav_msgs::msg::Path ros_path;
-    ros_path.header.stamp = this->now();
+    ros_path.header.stamp = now();
     ros_path.header.frame_id = latest_map_->header.frame_id;
 
     for (const auto &pose : path_) {
@@ -244,39 +247,41 @@ private:
 
     path_pub_->publish(ros_path);
 
-    RCLCPP_INFO(this->get_logger(), "Path published (%ld poses)",
-                ros_path.poses.size());
+    // RCLCPP_INFO(get_logger(), "Path published (%ld poses)",
+    //             ros_path.poses.size());
   }
 
   void controllerCallback() {
-    if (!latest_map_ || !have_start_ || !have_goal_ || path_.empty())
+    if (!latest_map_ || !have_start_ || !have_goal_)
       return;
 
     controller::ControllerParams controller_params;
-    controller_params.max_linear_velocity = 0.9;
-    controller_params.max_angular_velocity = 1.8;
-    controller_params.max_angular_acceleration = 1.5;
+    controller_params.max_linear_velocity = 0.8;
+    controller_params.max_angular_velocity = 2.0;
+    controller_params.max_angular_acceleration = 1.8;
     controller_params.approach_velocity_scaling_dist = 1.0;
+    controller_params.proximity_distance = 0.3;
     controller_params.distance_tolerance = 0.1;
 
     controller_.setParameters(&local_costmap_, &collision_checker_,
                               &trig_table_, controller_params);
 
+    auto start_pose = geometry::Pose3d(start_x_, start_y_, start_theta_);
+    auto goal_pose = geometry::Pose3d(goal_x_, goal_y_, goal_theta_);
     auto [v, w] = controller_.computeCommand(
-        geometry::Pose3d(start_x_, start_y_, start_theta_),
-        geometry::Pose3d(path_.back().x, path_.back().y, goal_theta_),
-        linear_velocity_, angular_velocity_, path_);
-    RCLCPP_INFO(
-        get_logger(), "Distance to goal: %f",
-        utils::distance(geometry::Pose2d(start_x_, start_y_), path_.back()));
-    RCLCPP_INFO(get_logger(), "Publishing v: %f and w: %f", v, w);
+        start_pose, goal_pose, linear_velocity_, angular_velocity_, path_);
+
+    RCLCPP_INFO(get_logger(), "Distance to goal: %lf",
+                utils::distance(start_pose,
+                                goal_pose));
+    RCLCPP_INFO(get_logger(), "Publishing v: %lf and w: %lf", v, w);
 
     geometry::Pose2d lookahead_point = controller_.getLookaheadPoint();
 
     visualization_msgs::msg::Marker marker;
 
     marker.header.frame_id = latest_map_->header.frame_id;
-    marker.header.stamp = this->get_clock()->now();
+    marker.header.stamp = get_clock()->now();
 
     marker.ns = "lookahead";
     marker.id = 0;
@@ -287,8 +292,6 @@ private:
     marker.pose.position.x = lookahead_point.x;
     marker.pose.position.y = lookahead_point.y;
     marker.pose.position.z = 0.0;
-
-    marker.pose.orientation.w = 1.0;
 
     marker.scale.x = 0.2;
     marker.scale.y = 0.2;
