@@ -112,6 +112,10 @@ private:
     declare_parameter("planner.expansion_cost", 200.0);
     declare_parameter("planner.path_length_weight", 0.985);
     declare_parameter("planner.max_explore_iterations", 50000);
+    declare_parameter("planner.motion_model", "DUBINS");
+    declare_parameter("planner.optimizer.iterations", 1000);
+    declare_parameter("planner.optimizer.smooth_weight", 0.3);
+    declare_parameter("planner.optimizer.data_weight", 0.2);
 
     get_parameter("planner.max_linear_velocity", planner_params_.max_linear_velocity);
     get_parameter("planner.max_angular_velocity", planner_params_.max_angular_velocity);
@@ -128,6 +132,10 @@ private:
     get_parameter("planner.expansion_cost", planner_params_.expansion_cost);
     get_parameter("planner.path_length_weight", planner_params_.path_length_weight);
     get_parameter("planner.max_explore_iterations", planner_params_.max_explore_iterations);
+    get_parameter("planner.motion_model", motion_model_type_);
+    get_parameter("planner.optimizer.iterations", optimizer_iterations_);
+    get_parameter("planner.optimizer.smooth_weight", optimizer_smooth_weight_);
+    get_parameter("planner.optimizer.data_weight", optimizer_data_weight_);
 
     declare_parameter("controller.controller_frequency", 20);
     declare_parameter("controller.max_linear_velocity", 1.0);
@@ -266,14 +274,19 @@ private:
     // RCLCPP_INFO(get_logger(), "Goal: %f %f", goal_x_, goal_y_);
 
     optimizer_.setCostmap(&global_costmap_);
-    optimizer_.setIterations(1000);
-    optimizer_.setWeights(0.3, 0.2);
+    optimizer_.setIterations(optimizer_iterations_);
+    optimizer_.setWeights(optimizer_smooth_weight_, optimizer_data_weight_);
 
     motion_model_.setTrigTable(&trig_table_);
-    motion_model_.setMotionModel(planner::MotionModelType::DUBINS);
+    if (motion_model_type_ == "DUBINS")
+      motion_model_.setMotionModel(planner::MotionModelType::DUBINS);
+    else
+      motion_model_.setMotionModel(planner::MotionModelType::REED_SHEPPS);
     motion_model_.setDistanceResolution(1.41421356 * global_costmap_.getResolution());
-    motion_model_.setMinTurningRadius(0.5 / 1.0);
-    motion_model_.setTolerance(0.5, 0.2);
+    motion_model_.setMinTurningRadius(planner_params_.max_linear_velocity /
+                                      planner_params_.max_angular_velocity);
+    motion_model_.setTolerance(planner_params_.distance_tolerance,
+                               planner_params_.angular_tolerance);
 
     planner_.setParameters(&global_costmap_,
                            &optimizer_,
@@ -411,6 +424,9 @@ private:
   grid::CostmapParams global_costmap_params_;
   grid::CostmapParams local_costmap_params_;
   double robot_radius_;
+  std::string motion_model_type_;
+  int optimizer_iterations_;
+  double optimizer_smooth_weight_, optimizer_data_weight_;
 
   double start_x_, start_y_, start_theta_;
   double goal_x_, goal_y_, goal_theta_;

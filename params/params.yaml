@@ -29,6 +29,11 @@ navigation:
       expansion_cost: 200.0
       path_length_weight: 0.985
       max_explore_iterations: 50000
+      motion_model: "DUBINS"
+      optimizer:
+        iterations: 1000
+        smooth_weight: 0.3
+        data_weight: 0.2
 
     controller:
       controller_frequency: 20
