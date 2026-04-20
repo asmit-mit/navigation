@@ -15,32 +15,24 @@ Dubins::Dubins() {
   distance_tolerance_ = 0.1;
 }
 
-void Dubins::setTrigTable(const utils::TrigTable *trig_table) {
-  trig_table_ = trig_table;
-}
+void Dubins::setTrigTable(const utils::TrigTable *trig_table) { trig_table_ = trig_table; }
 
-void Dubins::setDistanceResolution(double resolution) {
-  distance_resolution_ = resolution;
-}
+void Dubins::setDistanceResolution(double resolution) { distance_resolution_ = resolution; }
 
 void Dubins::setTolerance(double angle, double distance) {
   angular_tolerance_ = angle;
   distance_tolerance_ = distance;
 }
 
-void Dubins::setMinTurningRadius(double min_radius) {
-  min_turning_radius_ = min_radius;
-}
+void Dubins::setMinTurningRadius(double min_radius) { min_turning_radius_ = min_radius; }
 
 void Dubins::simulate(const geometry::Pose3d &start, const geometry::Pose3d &end) {
   assert(min_turning_radius_ > 0);
   assert(distance_resolution_ > 0);
   assert(trig_table_ != nullptr);
 
-  assert(std::isfinite(start.x) && std::isfinite(start.y) &&
-         std::isfinite(start.theta));
-  assert(std::isfinite(end.x) && std::isfinite(end.y) &&
-         std::isfinite(end.theta));
+  assert(std::isfinite(start.x) && std::isfinite(start.y) && std::isfinite(start.theta));
+  assert(std::isfinite(end.x) && std::isfinite(end.y) && std::isfinite(end.theta));
 
   start_ = start;
   end_ = end;
@@ -78,9 +70,7 @@ void Dubins::simulate(const geometry::Pose3d &start, const geometry::Pose3d &end
   pathLRL(p_reflect, true);
 }
 
-double Dubins::getOptimalDistance() {
-  return optimal_path_dist_ * min_turning_radius_;
-}
+double Dubins::getOptimalDistance() { return optimal_path_dist_ * min_turning_radius_; }
 
 std::vector<geometry::Pose2d> Dubins::getOptimalPath() {
   std::vector<geometry::Pose2d> poses;
@@ -107,10 +97,8 @@ std::vector<geometry::Pose2d> Dubins::getOptimalPath() {
         curr.y += ds * trig_table_->sin(curr.theta);
       } else {
         double R = 1.0 / curvature;
-        curr.x += R * (trig_table_->sin(curr.theta + dtheta) -
-                       trig_table_->sin(curr.theta));
-        curr.y -= R * (trig_table_->cos(curr.theta + dtheta) -
-                       trig_table_->cos(curr.theta));
+        curr.x += R * (trig_table_->sin(curr.theta + dtheta) - trig_table_->sin(curr.theta));
+        curr.y -= R * (trig_table_->cos(curr.theta + dtheta) - trig_table_->cos(curr.theta));
         curr.theta += dtheta;
       }
 
@@ -138,8 +126,7 @@ void Dubins::tryPath(double dist, int count, bool reflect) {
   std::copy_n(candidate_path_.begin(), count, optimal_path_.begin());
 }
 
-void Dubins::computeParams(const geometry::Pose3d &p, double &alpha, double &beta,
-                           double &d) {
+void Dubins::computeParams(const geometry::Pose3d &p, double &alpha, double &beta, double &d) {
   double dx = p.x;
   double dy = p.y;
 

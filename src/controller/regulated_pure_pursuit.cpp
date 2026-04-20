@@ -7,18 +7,18 @@ namespace controller {
 
 RegulatedPurePursuit::RegulatedPurePursuit() {}
 
-void RegulatedPurePursuit::setParameters(
-    const grid::LocalCostmap *costmap,
-    const geometry::CollisionChecker *collision_checker,
-    const utils::TrigTable *trig_table, controller::ControllerParams &params) {
+void RegulatedPurePursuit::setParameters(const grid::LocalCostmap *costmap,
+                                         const geometry::CollisionChecker *collision_checker,
+                                         const utils::TrigTable *trig_table,
+                                         controller::ControllerParams &params) {
   costmap_ = costmap;
   trig_table_ = trig_table;
   collision_checker_ = collision_checker;
 
-  max_linear_velocity_ = params.max_linear_velocity;
-  max_angular_velocity_ = params.max_angular_velocity;
-  max_linear_acceleration_ = params.max_linear_acceleration;
-  max_angular_acceleration_ = params.max_angular_acceleration;
+  max_linear_vel_ = params.max_linear_velocity;
+  max_angular_vel_ = params.max_angular_velocity;
+  max_linear_accel_ = params.max_linear_acceleration;
+  max_angular_accel_ = params.max_angular_acceleration;
   sim_time_ = params.sim_time;
   lookahead_distance_ = params.lookahead_distance;
   lookahead_gain_ = params.lookahead_gain;
@@ -26,23 +26,25 @@ void RegulatedPurePursuit::setParameters(
   min_lookahead_distance_ = params.min_lookahead_distance;
   proximity_distance_ = params.proximity_distance;
   approach_velocity_scaling_dist_ = params.approach_velocity_scaling_dist;
-  min_approach_linear_velocity_ = params.min_approach_linear_velocity;
+  min_linear_vel_ = params.min_approach_linear_velocity;
   min_heading_angle_error_ = params.min_heading_angle_error;
 
   proximity_heurisitc_scale_ = std::min(params.proximity_heuristic_scale, 1.0);
 
   distance_tolerance_ = params.distance_tolerance;
 
-  min_turning_radius_ = max_linear_velocity_ / max_angular_velocity_;
+  min_turning_radius_ = max_linear_vel_ / max_angular_vel_;
   T_k_ = 1.0 / min_turning_radius_;
 
-  control_duration_ = 1.0 / params.controller_frequency;
+  dt_ = 1.0 / params.controller_frequency;
 }
 
-std::pair<double, double> RegulatedPurePursuit::computeCommand(
-    const geometry::Pose3d &curr_pose, const geometry::Pose3d &goal_pose,
-    double linear_velocity, double angular_velocity,
-    const std::vector<geometry::Pose2d> &plan) {
+std::pair<double, double>
+RegulatedPurePursuit::computeCommand(const geometry::Pose3d &curr_pose,
+                                     const geometry::Pose3d &goal_pose,
+                                     double linear_velocity,
+                                     double angular_velocity,
+                                     const std::vector<geometry::Pose2d> &plan) {
   if (shouldRotateToGoalHeading(curr_pose, goal_pose)) {
     double angle_to_goal = utils::M(goal_pose.theta - curr_pose.theta);
     return rotateToHeading(angle_to_goal, angular_velocity);
@@ -60,31 +62,33 @@ std::pair<double, double> RegulatedPurePursuit::computeCommand(
 
   double k = computeCurvature(curr_pose, lookahead_point_);
 
-  double v = max_linear_velocity_;
+  double v = max_linear_vel_;
   v = std::min(v, regulateByCurvature(v, k));
   v = std::min(v, regulateByCostmap(v, curr_pose));
   v = std::min(v, regulateByGoalProximity(v, curr_pose, plan));
 
-  const double min_feasible =
-      linear_velocity - max_linear_acceleration_ * control_duration_;
-  const double max_feasible =
-      linear_velocity + max_linear_acceleration_ * control_duration_;
-  v = std::clamp(v, min_feasible, max_feasible);
+  double best_v, best_w;
+  const double min_feasible = linear_velocity - max_linear_accel_ * dt_;
+  const double max_feasible = linear_velocity + max_linear_accel_ * dt_;
 
-  double w = k * v;
-  w = std::clamp(w, -max_angular_velocity_, max_angular_velocity_);
+  best_v = std::clamp(v, min_feasible, max_feasible);
+  best_w = std::clamp(k * best_v, -max_angular_vel_, max_angular_vel_);
 
-  if (checkCollision(curr_pose, v, w, lookahead_dist)) {
+  // auto dynamic_window_vels = applyDynamicWindow(linear_velocity, angular_velocity, v, k);
+  // best_v = dynamic_window_vels.first;
+  // best_w = dynamic_window_vels.second;
+
+  if (checkCollision(curr_pose, best_v, best_w, lookahead_dist)) {
     std::cout << "Collision Detected\n";
     return {linear_velocity, angular_velocity};
   }
 
-  return {v, w};
+  return {best_v, best_w};
 }
 
-geometry::Pose2d RegulatedPurePursuit::findLookaheadPoint(
-    const geometry::Pose3d &curr_pose,
-    const std::vector<geometry::Pose2d> &plan, double lookahead_dist) const {
+geometry::Pose2d RegulatedPurePursuit::findLookaheadPoint(const geometry::Pose3d &curr_pose,
+                                                          const std::vector<geometry::Pose2d> &plan,
+                                                          double lookahead_dist) const {
   size_t closest_idx = 0;
   double min_dist = std::numeric_limits<double>::max();
   for (size_t i = 0; i < plan.size(); ++i) {
@@ -104,13 +108,10 @@ geometry::Pose2d RegulatedPurePursuit::findLookaheadPoint(
   return plan.back();
 }
 
-geometry::Pose2d RegulatedPurePursuit::getLookaheadPoint() const {
-  return lookahead_point_;
-}
+geometry::Pose2d RegulatedPurePursuit::getLookaheadPoint() const { return lookahead_point_; }
 
-double RegulatedPurePursuit::computeCurvature(
-    const geometry::Pose3d &curr_pose,
-    const geometry::Pose2d &lookahead_point) const {
+double RegulatedPurePursuit::computeCurvature(const geometry::Pose3d &curr_pose,
+                                              const geometry::Pose2d &lookahead_point) const {
   double dx = lookahead_point.x - curr_pose.x;
   double dy = lookahead_point.y - curr_pose.y;
   double theta = curr_pose.theta;
@@ -125,8 +126,7 @@ double RegulatedPurePursuit::computeCurvature(
   return 2.0 * y / l2;
 }
 
-double RegulatedPurePursuit::regulateByCurvature(double v,
-                                                 double curvature) const {
+double RegulatedPurePursuit::regulateByCurvature(double v, double curvature) const {
   double k = std::abs(curvature);
   if (k < epsilon_ || k <= T_k_)
     return v;
@@ -135,8 +135,7 @@ double RegulatedPurePursuit::regulateByCurvature(double v,
   return std::min(regulated, v);
 }
 
-double RegulatedPurePursuit::regulateByCostmap(
-    double v, const geometry::Pose3d &curr_pose) const {
+double RegulatedPurePursuit::regulateByCostmap(double v, const geometry::Pose3d &curr_pose) const {
   double d_O = costmap_->getDistanceAtWorld(curr_pose.x, curr_pose.y);
   if (d_O < 0.0 || d_O > proximity_distance_)
     return v;
@@ -144,12 +143,11 @@ double RegulatedPurePursuit::regulateByCostmap(
   double scale = proximity_heurisitc_scale_ * (d_O / proximity_distance_);
   scale = std::clamp(scale, 0.0, 1.0);
 
-  return std::max(v * scale, min_approach_linear_velocity_);
+  return std::max(v * scale, min_linear_vel_);
 }
 
 double RegulatedPurePursuit::regulateByGoalProximity(
-    double v, const geometry::Pose3d &curr_pose,
-    const std::vector<geometry::Pose2d> &plan) const {
+    double v, const geometry::Pose3d &curr_pose, const std::vector<geometry::Pose2d> &plan) const {
   double dist_to_goal = utils::distance(curr_pose, plan.back());
   if (dist_to_goal >= approach_velocity_scaling_dist_)
     return v;
@@ -157,48 +155,43 @@ double RegulatedPurePursuit::regulateByGoalProximity(
   double scale = dist_to_goal / approach_velocity_scaling_dist_;
   double approach_vel = v * scale;
 
-  approach_vel = std::max(approach_vel, min_approach_linear_velocity_);
+  approach_vel = std::max(approach_vel, min_linear_vel_);
 
   return std::min(v, approach_vel);
 }
 
-double
-RegulatedPurePursuit::angleToTarget(const geometry::Pose3d &curr_pose,
-                                    const geometry::Pose2d &target) const {
+double RegulatedPurePursuit::angleToTarget(const geometry::Pose3d &curr_pose,
+                                           const geometry::Pose2d &target) const {
   double dx = target.x - curr_pose.x;
   double dy = target.y - curr_pose.y;
   double bearing = std::atan2(dy, dx);
   return utils::M(bearing - curr_pose.theta);
 }
 
-std::pair<double, double>
-RegulatedPurePursuit::rotateToHeading(double angle_to_lookahead,
-                                      double angular_velocity) const {
+std::pair<double, double> RegulatedPurePursuit::rotateToHeading(double angle_to_lookahead,
+                                                                double curr_angular_vel) const {
   const double sign = angle_to_lookahead > 0.0 ? 1.0 : -1.0;
-  double angular_vel = sign * max_angular_velocity_;
+  double angular_vel = sign * max_angular_vel_;
 
-  const double min_feasible =
-      angular_velocity - max_angular_acceleration_ * control_duration_;
-  const double max_feasible =
-      angular_velocity + max_angular_acceleration_ * control_duration_;
+  const double min_feasible = curr_angular_vel - max_angular_accel_ * dt_;
+  const double max_feasible = curr_angular_vel + max_angular_accel_ * dt_;
   angular_vel = std::clamp(angular_vel, min_feasible, max_feasible);
 
-  double max_vel_to_stop =
-      std::sqrt(2.0 * max_angular_acceleration_ * std::abs(angle_to_lookahead));
+  double max_vel_to_stop = std::sqrt(2.0 * max_angular_accel_ * std::abs(angle_to_lookahead));
   if (std::abs(angular_vel) > max_vel_to_stop)
     angular_vel = sign * max_vel_to_stop;
 
   return {0.0, angular_vel};
 }
 
-bool RegulatedPurePursuit::shouldRotateToGoalHeading(
-    const geometry::Pose3d &curr_pose, const geometry::Pose2d &goal) const {
+bool RegulatedPurePursuit::shouldRotateToGoalHeading(const geometry::Pose3d &curr_pose,
+                                                     const geometry::Pose2d &goal) const {
   return utils::distance(curr_pose, goal) < distance_tolerance_ * 2.0;
 }
 
 bool RegulatedPurePursuit::checkCollision(const geometry::Pose3d &curr_pose,
-                                          double linear_velocity,
-                                          double angular_velocity,
+                                          double linear_vel,
+                                          double angular_vel,
                                           double lookahead_dist) const {
   if (collision_checker_->inCollisionLocal(curr_pose))
     return true;
@@ -209,9 +202,9 @@ bool RegulatedPurePursuit::checkCollision(const geometry::Pose3d &curr_pose,
 
   double t = 0.0;
   while (t < sim_time_) {
-    robot_pose.x += linear_velocity * dt * trig_table_->cos(robot_pose.theta);
-    robot_pose.y += linear_velocity * dt * trig_table_->sin(robot_pose.theta);
-    robot_pose.theta += angular_velocity * dt;
+    robot_pose.x += linear_vel * dt * trig_table_->cos(robot_pose.theta);
+    robot_pose.y += linear_vel * dt * trig_table_->sin(robot_pose.theta);
+    robot_pose.theta += angular_vel * dt;
 
     if (utils::distance(curr_pose, robot_pose) > lookahead_dist)
       break;
@@ -225,15 +218,9 @@ bool RegulatedPurePursuit::checkCollision(const geometry::Pose3d &curr_pose,
   return false;
 }
 
-bool RegulatedPurePursuit::goalReached(const geometry::Pose3d &curr_pose,
-                                       const geometry::Pose2d &end) const {
-  return utils::distance(curr_pose, end) < distance_tolerance_;
-}
-
-double
-RegulatedPurePursuit::computeLookaheadDistance(double linear_velocity) const {
-  return std::clamp(lookahead_gain_ * linear_velocity, min_lookahead_distance_,
-                    max_lookahead_distance_);
+double RegulatedPurePursuit::computeLookaheadDistance(double linear_velocity) const {
+  return std::clamp(
+      lookahead_gain_ * linear_velocity, min_lookahead_distance_, max_lookahead_distance_);
 }
 
 } // namespace controller

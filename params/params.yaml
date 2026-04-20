@@ -17,7 +17,7 @@ navigation:
     planner:
       max_linear_velocity: 1.0
       max_angular_velocity: 2.0
-      angular_resolution: 10.0
+      angular_resolution: 5.0
       angular_tolerance: 0.2
       distance_tolerance: 0.2
       analytical_expansion_ratio: 3.5
@@ -35,7 +35,7 @@ navigation:
       max_linear_velocity: 1.0
       max_angular_velocity: 2.0
       max_linear_acceleration: 1.0
-      max_angular_acceleration: 1.8
+      max_angular_acceleration: 2.3
       sim_time: 1.0
       lookahead_distance: 0.6
       lookahead_gain: 1.5

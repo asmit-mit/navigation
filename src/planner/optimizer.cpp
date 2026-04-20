@@ -4,12 +4,9 @@
 
 namespace planner {
 
-Optimizer::Optimizer()
-    : iterations_(10), smooth_weight_(0.1), data_weight_(0.5) {}
+Optimizer::Optimizer() : iterations_(10), smooth_weight_(0.1), data_weight_(0.5) {}
 
-void Optimizer::setCostmap(const grid::GlobalCostmap *costmap) {
-  costmap_ = costmap;
-}
+void Optimizer::setCostmap(const grid::GlobalCostmap *costmap) { costmap_ = costmap; }
 
 void Optimizer::setWeights(double smooth, double data) {
   smooth_weight_ = smooth;
@@ -18,8 +15,7 @@ void Optimizer::setWeights(double smooth, double data) {
 
 void Optimizer::setIterations(int iterations) { iterations_ = iterations; }
 
-std::vector<geometry::Pose2d>
-Optimizer::getSmoothPath(std::vector<geometry::Pose2d> &plan) const {
+std::vector<geometry::Pose2d> Optimizer::getSmoothPath(std::vector<geometry::Pose2d> &plan) const {
   if (plan.size() < 3)
     return plan;
 
@@ -45,8 +41,7 @@ Optimizer::getSmoothPath(std::vector<geometry::Pose2d> &plan) const {
       double new_y = y_i_y + data_weight_ * (x_i_y - y_i_y) +
                      smooth_weight_ * (y_next_y + y_prev_y - 2.0 * y_i_y);
 
-      if (costmap_->getCostAt(new_x, new_y) >=
-          (grid::GlobalCostmap::INSCRIBED_COST - 1))
+      if (costmap_->getCostAt(new_x, new_y) >= (grid::GlobalCostmap::INSCRIBED_COST - 1))
         continue;
 
       change += std::abs(new_x - new_path[i].x);
