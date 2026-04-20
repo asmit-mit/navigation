@@ -55,8 +55,12 @@ ament_target_dependencies(
   tf2_ros
   tf2_geometry_msgs
 )
+
 install(TARGETS navigation
   DESTINATION lib/${PROJECT_NAME})
+
+install(DIRECTORY params
+  DESTINATION share/${PROJECT_NAME})
 
 if(BUILD_TESTING)
   find_package(ament_lint_auto REQUIRED)

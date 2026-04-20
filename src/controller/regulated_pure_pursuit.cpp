@@ -29,7 +29,7 @@ void RegulatedPurePursuit::setParameters(
   min_approach_linear_velocity_ = params.min_approach_linear_velocity;
   min_heading_angle_error_ = params.min_heading_angle_error;
 
-  proximity_heurisitc_scale_ = std::min(params.proximity_heurisitc_scale, 1.0);
+  proximity_heurisitc_scale_ = std::min(params.proximity_heuristic_scale, 1.0);
 
   distance_tolerance_ = params.distance_tolerance;
 

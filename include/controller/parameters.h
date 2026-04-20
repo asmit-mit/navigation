@@ -16,7 +16,7 @@ struct ControllerParams {
   double min_lookahead_distance = 0.3;
 
   double proximity_distance = 0.3;
-  double proximity_heurisitc_scale = 1.0;
+  double proximity_heuristic_scale = 1.0;
 
   double approach_velocity_scaling_dist = 1.0;
   double min_approach_linear_velocity = 0.05;

@@ -23,6 +23,7 @@
 #include "geometry/pose.h"
 #include "grid/global_costmap.h"
 #include "grid/local_costmap.h"
+#include "grid/parameters.h"
 #include "planner/hybrid_astar.h"
 #include "planner/motion_model.h"
 #include "planner/optimizer.h"
@@ -37,6 +38,8 @@ using std::endl;
 class Navigation : public rclcpp::Node {
 public:
   Navigation() : Node("navigation") {
+    declareAndGetParameters();
+
     global_costmap_msg_ = nav_msgs::msg::OccupancyGrid();
     local_costmap_msg_ = nav_msgs::msg::OccupancyGrid();
 
@@ -53,35 +56,156 @@ public:
     odom_sub_ = create_subscription<nav_msgs::msg::Odometry>(
         "/odom", 10, std::bind(&Navigation::odomCallback, this, _1));
 
-    cmd_vel_pub_ =
-        create_publisher<geometry_msgs::msg::Twist>("/cmd_vel", 10);
+    cmd_vel_pub_ = create_publisher<geometry_msgs::msg::Twist>("/cmd_vel", 10);
 
-    path_pub_ =
-        create_publisher<nav_msgs::msg::Path>("/hybrid_astar_path", 10);
+    path_pub_ = create_publisher<nav_msgs::msg::Path>("/hybrid_astar_path", 10);
 
-    global_costmap_pub_ = create_publisher<nav_msgs::msg::OccupancyGrid>(
-        "/global_costmap", 10);
+    global_costmap_pub_ =
+        create_publisher<nav_msgs::msg::OccupancyGrid>("/global_costmap", 10);
 
-    local_costmap_pub_ = create_publisher<nav_msgs::msg::OccupancyGrid>(
-        "/local_costmap", 10);
+    local_costmap_pub_ =
+        create_publisher<nav_msgs::msg::OccupancyGrid>("/local_costmap", 10);
 
-    lookahead_pose_pub_ =
-        create_publisher<visualization_msgs::msg::Marker>(
-            "/lookahead_pose", 10);
+    lookahead_pose_pub_ = create_publisher<visualization_msgs::msg::Marker>(
+        "/lookahead_pose", 10);
 
-    planner_timer_ = create_wall_timer(
-        200ms, std::bind(&Navigation::plannerCallback, this));
+    planner_timer_ =
+        create_wall_timer(200ms, std::bind(&Navigation::plannerCallback, this));
 
     controller_timer_ = create_wall_timer(
         100ms, std::bind(&Navigation::controllerCallback, this));
 
-    costmap_timer_ = create_wall_timer(
-        200ms, std::bind(&Navigation::costmapCallback, this));
+    costmap_timer_ =
+        create_wall_timer(200ms, std::bind(&Navigation::costmapCallback, this));
 
     RCLCPP_INFO(get_logger(), "navigation node started");
   }
 
 private:
+  void declareAndGetParameters() {
+    // ---- Global costmap ----
+    declare_parameter("global_costmap.inflation_radius", 0.55);
+    declare_parameter("global_costmap.inscribed_radius", 0.1);
+    declare_parameter("global_costmap.scaling_factor", 3.0);
+
+    get_parameter("global_costmap.inflation_radius",
+                  global_costmap_params_.inflation_radius);
+    get_parameter("global_costmap.inscribed_radius",
+                  global_costmap_params_.inscribed_radius);
+    get_parameter("global_costmap.scaling_factor",
+                  global_costmap_params_.scaling_factor);
+
+    // ---- Local costmap ----
+    declare_parameter("local_costmap.window_size", 3.0);
+    declare_parameter("local_costmap.inflation_radius", 1.0);
+    declare_parameter("local_costmap.inscribed_radius", 0.1);
+    declare_parameter("local_costmap.scaling_factor", 3.0);
+
+    get_parameter("local_costmap.window_size",
+                  local_costmap_params_.window_size);
+    get_parameter("local_costmap.inflation_radius",
+                  local_costmap_params_.inflation_radius);
+    get_parameter("local_costmap.inscribed_radius",
+                  local_costmap_params_.inscribed_radius);
+    get_parameter("local_costmap.scaling_factor",
+                  local_costmap_params_.scaling_factor);
+
+    // ---- Collision checker ----
+    declare_parameter("collision_checker.robot_radius", 0.12);
+    get_parameter("collision_checker.robot_radius", robot_radius_);
+
+    // ---- Planner ----
+    declare_parameter("planner.max_linear_velocity", 1.0);
+    declare_parameter("planner.max_angular_velocity", 2.0);
+    declare_parameter("planner.angular_resolution", 5.0);
+    declare_parameter("planner.angular_tolerance", 0.2);
+    declare_parameter("planner.distance_tolerance", 0.2);
+    declare_parameter("planner.analytical_expansion_ratio", 3.5);
+    declare_parameter("planner.analytical_expansion_max_length", 3.0);
+    declare_parameter("planner.steering_penalty", 0.8);
+    declare_parameter("planner.change_steering_penalty", 0.3);
+    declare_parameter("planner.reverse_penalty", 2.0);
+    declare_parameter("planner.cost_penalty", 12.0);
+    declare_parameter("planner.expansion_cost", 200.0);
+    declare_parameter("planner.path_length_weight", 0.985);
+    declare_parameter("planner.max_explore_iterations", 50000);
+
+    get_parameter("planner.max_linear_velocity",
+                  planner_params_.max_linear_velocity);
+    get_parameter("planner.max_angular_velocity",
+                  planner_params_.max_angular_velocity);
+    get_parameter("planner.angular_resolution",
+                  planner_params_.angular_resolution);
+    get_parameter("planner.angular_tolerance",
+                  planner_params_.angular_tolerance);
+    get_parameter("planner.distance_tolerance",
+                  planner_params_.distance_tolerance);
+    get_parameter("planner.analytical_expansion_ratio",
+                  planner_params_.analytical_expansion_ratio);
+    get_parameter("planner.analytical_expansion_max_length",
+                  planner_params_.analytical_expansion_max_length);
+    get_parameter("planner.steering_penalty", planner_params_.steering_penalty);
+    get_parameter("planner.change_steering_penalty",
+                  planner_params_.change_steering_penalty);
+    get_parameter("planner.reverse_penalty", planner_params_.reverse_penalty);
+    get_parameter("planner.cost_penalty", planner_params_.cost_penalty);
+    get_parameter("planner.expansion_cost", planner_params_.expansion_cost);
+    get_parameter("planner.path_length_weight",
+                  planner_params_.path_length_weight);
+    get_parameter("planner.max_explore_iterations",
+                  planner_params_.max_explore_iterations);
+
+    // ---- Controller ----
+    declare_parameter("controller.controller_frequency", 20);
+    declare_parameter("controller.max_linear_velocity", 1.0);
+    declare_parameter("controller.max_angular_velocity", 2.0);
+    declare_parameter("controller.max_linear_acceleration", 1.0);
+    declare_parameter("controller.max_angular_acceleration", 1.8);
+    declare_parameter("controller.sim_time", 1.0);
+    declare_parameter("controller.lookahead_distance", 0.6);
+    declare_parameter("controller.lookahead_gain", 1.5);
+    declare_parameter("controller.max_lookahead_distance", 0.9);
+    declare_parameter("controller.min_lookahead_distance", 0.3);
+    declare_parameter("controller.proximity_distance", 0.3);
+    declare_parameter("controller.proximity_heurisitc_scale", 1.0);
+    declare_parameter("controller.approach_velocity_scaling_dist", 1.0);
+    declare_parameter("controller.min_approach_linear_velocity", 0.05);
+    declare_parameter("controller.min_heading_angle_error", 0.785);
+    declare_parameter("controller.distance_tolerance", 0.1);
+
+    get_parameter("controller.controller_frequency",
+                  controller_params_.controller_frequency);
+    get_parameter("controller.max_linear_velocity",
+                  controller_params_.max_linear_velocity);
+    get_parameter("controller.max_angular_velocity",
+                  controller_params_.max_angular_velocity);
+    get_parameter("controller.max_linear_acceleration",
+                  controller_params_.max_linear_acceleration);
+    get_parameter("controller.max_angular_acceleration",
+                  controller_params_.max_angular_acceleration);
+    get_parameter("controller.sim_time", controller_params_.sim_time);
+    get_parameter("controller.lookahead_distance",
+                  controller_params_.lookahead_distance);
+    get_parameter("controller.lookahead_gain",
+                  controller_params_.lookahead_gain);
+    get_parameter("controller.max_lookahead_distance",
+                  controller_params_.max_lookahead_distance);
+    get_parameter("controller.min_lookahead_distance",
+                  controller_params_.min_lookahead_distance);
+    get_parameter("controller.proximity_distance",
+                  controller_params_.proximity_distance);
+    get_parameter("controller.proximity_heuristic_scale",
+                  controller_params_.proximity_heuristic_scale);
+    get_parameter("controller.approach_velocity_scaling_dist",
+                  controller_params_.approach_velocity_scaling_dist);
+    get_parameter("controller.min_approach_linear_velocity",
+                  controller_params_.min_approach_linear_velocity);
+    get_parameter("controller.min_heading_angle_error",
+                  controller_params_.min_heading_angle_error);
+    get_parameter("controller.distance_tolerance",
+                  controller_params_.distance_tolerance);
+  }
+
   void mapCallback(const nav_msgs::msg::OccupancyGrid::SharedPtr msg) {
     latest_map_ = msg;
   }
@@ -106,7 +230,10 @@ private:
 
     edt_.computeDT(latest_map_);
 
-    global_costmap_.setParameters(latest_map_, &edt_, 0.55, 0.1, 3.0);
+    global_costmap_.setParameters(latest_map_, &edt_,
+                                  global_costmap_params_.inflation_radius,
+                                  global_costmap_params_.inscribed_radius,
+                                  global_costmap_params_.scaling_factor);
 
     int size = global_costmap_.getHeight() * global_costmap_.getWidth();
 
@@ -133,8 +260,11 @@ private:
     double start_x = start_pose_.pose.position.x;
     double start_y = start_pose_.pose.position.y;
 
-    local_costmap_.setParameters(latest_map_, &edt_, start_x, start_y, 3.0, 1.0,
-                                 0.1, 3.0);
+    local_costmap_.setParameters(latest_map_, &edt_, start_x, start_y,
+                                 local_costmap_params_.window_size,
+                                 local_costmap_params_.inflation_radius,
+                                 local_costmap_params_.inscribed_radius,
+                                 local_costmap_params_.scaling_factor);
 
     int local_size =
         local_costmap_.getWindowWidth() * local_costmap_.getWindowHeight();
@@ -158,7 +288,8 @@ private:
     // RCLCPP_INFO(get_logger(), "Publishing Local Costmap");
     local_costmap_pub_->publish(local_costmap_msg_);
 
-    collision_checker_.setParameters(&global_costmap_, &local_costmap_, 0.12);
+    collision_checker_.setParameters(&global_costmap_, &local_costmap_,
+                                     robot_radius_);
 
     // RCLCPP_INFO(get_logger(), "Distance to obstacle: %lf",
     //             local_costmap_.getDistanceAtWorld(start_x, start_y));
@@ -198,19 +329,8 @@ private:
     motion_model_.setMinTurningRadius(0.5 / 1.0);
     motion_model_.setTolerance(0.5, 0.2);
 
-    planner::HybridAstarParams planner_params;
-    planner_params.max_linear_velocity = 1.0;
-    planner_params.max_angular_velocity = 2.0;
-    planner_params.distance_tolerance = 0.2;
-    planner_params.angular_tolerance = 0.2;
-    planner_params.angular_resolution = 5;
-    planner_params.reverse_penalty = 2.1;
-    planner_params.steering_penalty = 0.8;
-    planner_params.change_steering_penalty = 0.3;
-    planner_params.cost_penalty = 12.0;
-
     planner_.setParameters(&global_costmap_, &optimizer_, &motion_model_,
-                           &collision_checker_, &trig_table_, planner_params);
+                           &collision_checker_, &trig_table_, planner_params_);
     planner_.setStart(start_x_, start_y_, start_theta_);
     planner_.setGoal(goal_x_, goal_y_, goal_theta_);
 
@@ -255,17 +375,8 @@ private:
     if (!latest_map_ || !have_start_ || !have_goal_)
       return;
 
-    controller::ControllerParams controller_params;
-    controller_params.max_linear_velocity = 1.0;
-    controller_params.max_angular_velocity = 2.0;
-    controller_params.max_linear_acceleration = 1.0;
-    controller_params.max_angular_acceleration = 1.8;
-    controller_params.approach_velocity_scaling_dist = 1.0;
-    controller_params.proximity_distance = 0.3;
-    controller_params.distance_tolerance = 0.1;
-
     controller_.setParameters(&local_costmap_, &collision_checker_,
-                              &trig_table_, controller_params);
+                              &trig_table_, controller_params_);
 
     auto start_pose = geometry::Pose3d(start_x_, start_y_, start_theta_);
     auto goal_pose = geometry::Pose3d(goal_x_, goal_y_, goal_theta_);
@@ -273,8 +384,7 @@ private:
         start_pose, goal_pose, linear_velocity_, angular_velocity_, path_);
 
     RCLCPP_INFO(get_logger(), "Distance to goal: %lf",
-                utils::distance(start_pose,
-                                goal_pose));
+                utils::distance(start_pose, goal_pose));
     RCLCPP_INFO(get_logger(), "Publishing v: %lf and w: %lf", v, w);
 
     geometry::Pose2d lookahead_point = controller_.getLookaheadPoint();
@@ -348,6 +458,12 @@ private:
   planner::MotionModel motion_model_;
   geometry::CollisionChecker collision_checker_;
   controller::RegulatedPurePursuit controller_;
+
+  controller::ControllerParams controller_params_;
+  planner::HybridAstarParams planner_params_;
+  grid::CostmapParams global_costmap_params_;
+  grid::CostmapParams local_costmap_params_;
+  double robot_radius_;
 
   double start_x_, start_y_, start_theta_;
   double goal_x_, goal_y_, goal_theta_;
