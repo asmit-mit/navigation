@@ -199,7 +199,7 @@ private:
     motion_model_.setTolerance(0.5, 0.2);
 
     planner::HybridAstarParams planner_params;
-    planner_params.max_linear_velocity = 0.8;
+    planner_params.max_linear_velocity = 1.0;
     planner_params.max_angular_velocity = 2.0;
     planner_params.distance_tolerance = 0.2;
     planner_params.angular_tolerance = 0.2;
@@ -256,8 +256,9 @@ private:
       return;
 
     controller::ControllerParams controller_params;
-    controller_params.max_linear_velocity = 0.8;
+    controller_params.max_linear_velocity = 1.0;
     controller_params.max_angular_velocity = 2.0;
+    controller_params.max_linear_acceleration = 1.0;
     controller_params.max_angular_acceleration = 1.8;
     controller_params.approach_velocity_scaling_dist = 1.0;
     controller_params.proximity_distance = 0.3;

@@ -3,10 +3,10 @@
 #include <vector>
 
 #include "controller/parameters.h"
+#include "geometry/collison_checker.h"
 #include "geometry/pose.h"
 #include "grid/local_costmap.h"
 #include "utils/trig_utils.h"
-#include "geometry/collison_checker.h"
 
 namespace controller {
 
@@ -47,26 +47,21 @@ private:
   bool shouldRotateToGoalHeading(const geometry::Pose3d &curr_pose,
                                  const geometry::Pose2d &goal) const;
   bool checkCollision(const geometry::Pose3d &curr_pose, double linear_velocity,
-                      double angular_velocity,
-                      double lookahead_dist) const;
+                      double angular_velocity, double lookahead_dist) const;
 
   std::pair<double, double> rotateToHeading(double angle_to_lookahead,
                                             double angular_velocity) const;
   double computeLookaheadDistance(double linear_velocity) const;
 
 private:
-  double max_linear_velocity_;
-  double max_angular_velocity_;
-  double max_angular_acceleration_;
+  double max_linear_velocity_, max_angular_velocity_;
+  double max_linear_acceleration_, max_angular_acceleration_;
   double sim_time_;
 
-  double lookahead_distance_;
-  double lookahead_gain_;
-  double max_lookahead_distance_;
-  double min_lookahead_distance_;
+  double lookahead_distance_, lookahead_gain_;
+  double max_lookahead_distance_, min_lookahead_distance_;
 
-  double proximity_distance_;
-  double proximity_heurisitc_scale_;
+  double proximity_distance_, proximity_heurisitc_scale_;
 
   double approach_velocity_scaling_dist_;
   double min_approach_linear_velocity_;

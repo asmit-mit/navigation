@@ -17,6 +17,7 @@ void RegulatedPurePursuit::setParameters(
 
   max_linear_velocity_ = params.max_linear_velocity;
   max_angular_velocity_ = params.max_angular_velocity;
+  max_linear_acceleration_ = params.max_linear_acceleration;
   max_angular_acceleration_ = params.max_angular_acceleration;
   sim_time_ = params.sim_time;
   lookahead_distance_ = params.lookahead_distance;
@@ -63,6 +64,12 @@ std::pair<double, double> RegulatedPurePursuit::computeCommand(
   v = std::min(v, regulateByCurvature(v, k));
   v = std::min(v, regulateByCostmap(v, curr_pose));
   v = std::min(v, regulateByGoalProximity(v, curr_pose, plan));
+
+  const double min_feasible =
+      linear_velocity - max_linear_acceleration_ * control_duration_;
+  const double max_feasible =
+      linear_velocity + max_linear_acceleration_ * control_duration_;
+  v = std::clamp(v, min_feasible, max_feasible);
 
   double w = k * v;
   w = std::clamp(w, -max_angular_velocity_, max_angular_velocity_);
