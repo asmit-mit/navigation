@@ -49,47 +49,62 @@ public:
 
     map_sub_ = create_subscription<nav_msgs::msg::OccupancyGrid>(
         "/map", map_qos, std::bind(&Navigation::mapCallback, this, _1));
-
     goal_sub_ = create_subscription<geometry_msgs::msg::PoseStamped>(
         "/goal_pose", 10, std::bind(&Navigation::goalCallback, this, _1));
-
     odom_sub_ = create_subscription<nav_msgs::msg::Odometry>(
         "/odom", 10, std::bind(&Navigation::odomCallback, this, _1));
 
     cmd_vel_pub_ = create_publisher<geometry_msgs::msg::Twist>("/cmd_vel", 10);
+    path_pub_ = create_publisher<nav_msgs::msg::Path>("nav/planner/hybrid_astar_path", 10);
+    footprint_pub_ = create_publisher<visualization_msgs::msg::Marker>("nav/costmap/footprint", 10);
+    global_costmap_pub_ = create_publisher<nav_msgs::msg::OccupancyGrid>(
+        "nav/costmap/global_costmap", 10);
+    local_costmap_pub_ = create_publisher<nav_msgs::msg::OccupancyGrid>("nav/costmap/local_costmap",
+                                                                        10);
+    lookahead_pose_pub_ = create_publisher<visualization_msgs::msg::Marker>(
+        "nav/controller/lookahead_pose", 10);
 
-    path_pub_ = create_publisher<nav_msgs::msg::Path>("/hybrid_astar_path", 10);
+    auto local_costmap_period = std::chrono::milliseconds(
+        static_cast<int>(1000.0 / local_costmap_frequency_));
+    auto global_costmap_period = std::chrono::milliseconds(
+        static_cast<int>(1000.0 / global_costmap_frequency_));
+    auto planner_period = std::chrono::milliseconds(static_cast<int>(1000.0 / planner_frequency_));
+    auto controller_period = std::chrono::milliseconds(
+        static_cast<int>(1000.0 / controller_params_.controller_frequency));
 
-    global_costmap_pub_ = create_publisher<nav_msgs::msg::OccupancyGrid>("/global_costmap", 10);
-
-    local_costmap_pub_ = create_publisher<nav_msgs::msg::OccupancyGrid>("/local_costmap", 10);
-
-    lookahead_pose_pub_ = create_publisher<visualization_msgs::msg::Marker>("/lookahead_pose", 10);
-
-    planner_timer_ = create_wall_timer(200ms, std::bind(&Navigation::plannerCallback, this));
-
-    controller_timer_ = create_wall_timer(100ms, std::bind(&Navigation::controllerCallback, this));
-
-    costmap_timer_ = create_wall_timer(200ms, std::bind(&Navigation::costmapCallback, this));
+    footprint_timer_ = create_wall_timer(local_costmap_period,
+                                         std::bind(&Navigation::footprintCallback, this));
+    global_costmap_timer_ = create_wall_timer(global_costmap_period,
+                                              std::bind(&Navigation::globalCostmapCallback, this));
+    local_costmap_timer_ = create_wall_timer(local_costmap_period,
+                                             std::bind(&Navigation::localCostmapCallback, this));
+    planner_timer_ = create_wall_timer(planner_period,
+                                       std::bind(&Navigation::plannerCallback, this));
+    controller_timer_ = create_wall_timer(controller_period,
+                                          std::bind(&Navigation::controllerCallback, this));
 
     RCLCPP_INFO(get_logger(), "navigation node started");
   }
 
 private:
   void declareAndGetParameters() {
+    declare_parameter("global_costmap.frequency", 1);
     declare_parameter("global_costmap.inflation_radius", 0.55);
     declare_parameter("global_costmap.inscribed_radius", 0.1);
     declare_parameter("global_costmap.scaling_factor", 3.0);
 
+    get_parameter("global_costmap.frequency", global_costmap_frequency_);
     get_parameter("global_costmap.inflation_radius", global_costmap_params_.inflation_radius);
     get_parameter("global_costmap.inscribed_radius", global_costmap_params_.inscribed_radius);
     get_parameter("global_costmap.scaling_factor", global_costmap_params_.scaling_factor);
 
+    declare_parameter("local_costmap.frequency", 5);
     declare_parameter("local_costmap.window_size", 3.0);
     declare_parameter("local_costmap.inflation_radius", 1.0);
     declare_parameter("local_costmap.inscribed_radius", 0.1);
     declare_parameter("local_costmap.scaling_factor", 3.0);
 
+    get_parameter("local_costmap.frequency", local_costmap_frequency_);
     get_parameter("local_costmap.window_size", local_costmap_params_.window_size);
     get_parameter("local_costmap.inflation_radius", local_costmap_params_.inflation_radius);
     get_parameter("local_costmap.inscribed_radius", local_costmap_params_.inscribed_radius);
@@ -98,6 +113,7 @@ private:
     declare_parameter("collision_checker.robot_radius", 0.12);
     get_parameter("collision_checker.robot_radius", robot_radius_);
 
+    declare_parameter("planner.frequency", 10);
     declare_parameter("planner.max_linear_velocity", 1.0);
     declare_parameter("planner.max_angular_velocity", 2.0);
     declare_parameter("planner.angular_resolution", 5.0);
@@ -117,6 +133,7 @@ private:
     declare_parameter("planner.optimizer.smooth_weight", 0.3);
     declare_parameter("planner.optimizer.data_weight", 0.2);
 
+    get_parameter("planner.frequency", planner_frequency_);
     get_parameter("planner.max_linear_velocity", planner_params_.max_linear_velocity);
     get_parameter("planner.max_angular_velocity", planner_params_.max_angular_velocity);
     get_parameter("planner.angular_resolution", planner_params_.angular_resolution);
@@ -192,7 +209,50 @@ private:
     have_goal_ = true;
   }
 
-  void costmapCallback() {
+  void footprintCallback() {
+    if (!have_start_ || !latest_map_)
+      return;
+
+    visualization_msgs::msg::Marker marker;
+
+    marker.header.frame_id = latest_map_->header.frame_id;
+    marker.header.stamp = now();
+    marker.ns = "robot_footprint";
+    marker.id = 0;
+    marker.type = visualization_msgs::msg::Marker::LINE_STRIP;
+    marker.action = visualization_msgs::msg::Marker::ADD;
+
+    marker.pose.position.x = start_pose_.pose.position.x;
+    marker.pose.position.y = start_pose_.pose.position.y;
+    marker.pose.position.z = 0.0;
+
+    marker.pose.orientation = start_pose_.pose.orientation;
+
+    marker.scale.x = 0.03;
+
+    marker.color.r = 0.0;
+    marker.color.g = 1.0;
+    marker.color.b = 0.0;
+    marker.color.a = 1.0;
+
+    const int num_points = 60;
+    marker.points.clear();
+
+    for (int i = 0; i <= num_points; ++i) {
+      double angle = 2.0 * M_PI * i / num_points;
+
+      geometry_msgs::msg::Point p;
+      p.x = robot_radius_ * trig_table_.cos(angle);
+      p.y = robot_radius_ * trig_table_.sin(angle);
+      p.z = 0.0;
+
+      marker.points.push_back(p);
+    }
+
+    footprint_pub_->publish(marker);
+  }
+
+  void globalCostmapCallback() {
     if (!latest_map_)
       return;
 
@@ -206,7 +266,8 @@ private:
 
     int size = global_costmap_.getHeight() * global_costmap_.getWidth();
 
-    global_costmap_msg_.header = latest_map_->header;
+    global_costmap_msg_.header.frame_id = latest_map_->header.frame_id;
+    global_costmap_msg_.header.stamp = now();
     global_costmap_msg_.info = latest_map_->info;
     global_costmap_msg_.data.resize(size);
 
@@ -221,7 +282,9 @@ private:
 
     // RCLCPP_INFO(get_logger(), "Publishing Global Costmap");
     global_costmap_pub_->publish(global_costmap_msg_);
+  }
 
+  void localCostmapCallback() {
     if (!have_start_)
       return;
 
@@ -239,7 +302,8 @@ private:
 
     int local_size = local_costmap_.getWindowWidth() * local_costmap_.getWindowHeight();
 
-    local_costmap_msg_.header = latest_map_->header;
+    local_costmap_msg_.header.frame_id = latest_map_->header.frame_id;
+    local_costmap_msg_.header.stamp = now();
     local_costmap_msg_.info = latest_map_->info;
     local_costmap_msg_.info.width = local_costmap_.getWindowWidth();
     local_costmap_msg_.info.height = local_costmap_.getWindowHeight();
@@ -314,8 +378,8 @@ private:
     }
 
     nav_msgs::msg::Path ros_path;
-    ros_path.header.stamp = now();
     ros_path.header.frame_id = latest_map_->header.frame_id;
+    ros_path.header.stamp = now();
 
     for (const auto &pose : path_) {
       geometry_msgs::msg::PoseStamped pose_stamped;
@@ -389,13 +453,16 @@ private:
 private:
   rclcpp::TimerBase::SharedPtr planner_timer_;
   rclcpp::TimerBase::SharedPtr controller_timer_;
-  rclcpp::TimerBase::SharedPtr costmap_timer_;
+  rclcpp::TimerBase::SharedPtr global_costmap_timer_;
+  rclcpp::TimerBase::SharedPtr local_costmap_timer_;
+  rclcpp::TimerBase::SharedPtr footprint_timer_;
 
   rclcpp::Subscription<nav_msgs::msg::OccupancyGrid>::SharedPtr map_sub_;
   rclcpp::Subscription<nav_msgs::msg::Odometry>::SharedPtr odom_sub_;
   rclcpp::Subscription<geometry_msgs::msg::PoseStamped>::SharedPtr goal_sub_;
 
   rclcpp::Publisher<nav_msgs::msg::Path>::SharedPtr path_pub_;
+  rclcpp::Publisher<visualization_msgs::msg::Marker>::SharedPtr footprint_pub_;
   rclcpp::Publisher<nav_msgs::msg::OccupancyGrid>::SharedPtr global_costmap_pub_;
   rclcpp::Publisher<nav_msgs::msg::OccupancyGrid>::SharedPtr local_costmap_pub_;
   rclcpp::Publisher<visualization_msgs::msg::Marker>::SharedPtr lookahead_pose_pub_;
@@ -433,6 +500,8 @@ private:
 
   bool have_start_ = false;
   bool have_goal_ = false;
+
+  int global_costmap_frequency_, local_costmap_frequency_, planner_frequency_;
 
   double linear_velocity_, angular_velocity_;
 };

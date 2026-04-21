@@ -1,11 +1,13 @@
 navigation:
   ros__parameters:
     global_costmap:
+      frequency: 1
       inflation_radius: 0.55
       inscribed_radius: 0.1
       scaling_factor: 3.0
 
     local_costmap:
+      frequency: 5
       window_size: 3.0
       inflation_radius: 1.0
       inscribed_radius: 0.1
@@ -15,6 +17,7 @@ navigation:
       robot_radius: 0.12
 
     planner:
+      frequency: 5
       max_linear_velocity: 1.0
       max_angular_velocity: 2.0
       angular_resolution: 5.0
