@@ -15,6 +15,17 @@ def generate_launch_description():
             executable='navigation',
             name='navigation',
             output='screen',
-            parameters=[params_file]
+            parameters=[params_file],
+            remappings=[
+                ('map_sub', '/perception/map'),
+                ('goal_sub', '/goal_pose'),
+                ('odom_sub', '/odom'),
+                ('cmd_vel', '/cmd_vel'),
+                ('path_pub', '/nav/planner/hybrid_astar_path'),
+                ('footprint_pub', '/nav/costmap/footprint'),
+                ('global_costmap_pub', '/nav/costmap/global_costmap'),
+                ('local_costmap_pub', '/nav/costmap/local_costmap'),
+                ('lookahead_pub', '/nav/controller/lookahead_pose'),
+            ]
         )
     ])

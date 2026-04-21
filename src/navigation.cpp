@@ -48,21 +48,18 @@ public:
     map_qos.reliable();
 
     map_sub_ = create_subscription<nav_msgs::msg::OccupancyGrid>(
-        "/map", map_qos, std::bind(&Navigation::mapCallback, this, _1));
+        "map_sub", map_qos, std::bind(&Navigation::mapCallback, this, _1));
     goal_sub_ = create_subscription<geometry_msgs::msg::PoseStamped>(
-        "/goal_pose", 10, std::bind(&Navigation::goalCallback, this, _1));
+        "goal_sub", 10, std::bind(&Navigation::goalCallback, this, _1));
     odom_sub_ = create_subscription<nav_msgs::msg::Odometry>(
-        "/odom", 10, std::bind(&Navigation::odomCallback, this, _1));
+        "odom_sub", 10, std::bind(&Navigation::odomCallback, this, _1));
 
-    cmd_vel_pub_ = create_publisher<geometry_msgs::msg::Twist>("/cmd_vel", 10);
-    path_pub_ = create_publisher<nav_msgs::msg::Path>("nav/planner/hybrid_astar_path", 10);
-    footprint_pub_ = create_publisher<visualization_msgs::msg::Marker>("nav/costmap/footprint", 10);
-    global_costmap_pub_ = create_publisher<nav_msgs::msg::OccupancyGrid>(
-        "nav/costmap/global_costmap", 10);
-    local_costmap_pub_ = create_publisher<nav_msgs::msg::OccupancyGrid>("nav/costmap/local_costmap",
-                                                                        10);
-    lookahead_pose_pub_ = create_publisher<visualization_msgs::msg::Marker>(
-        "nav/controller/lookahead_pose", 10);
+    cmd_vel_pub_ = create_publisher<geometry_msgs::msg::Twist>("cmd_vel", 10);
+    path_pub_ = create_publisher<nav_msgs::msg::Path>("path_pub", 10);
+    footprint_pub_ = create_publisher<visualization_msgs::msg::Marker>("footprint_pub", 10);
+    global_costmap_pub_ = create_publisher<nav_msgs::msg::OccupancyGrid>("global_costmap_pub", 10);
+    local_costmap_pub_ = create_publisher<nav_msgs::msg::OccupancyGrid>("local_costmap_pub", 10);
+    lookahead_pose_pub_ = create_publisher<visualization_msgs::msg::Marker>("lookahead_pub", 10);
 
     auto local_costmap_period = std::chrono::milliseconds(
         static_cast<int>(1000.0 / local_costmap_frequency_));
