@@ -1,3 +1,7 @@
+// Adapted from nathanlct/reeds-shepp-curves (Python, MIT License)
+// https://github.com/nathanlct/reeds-shepp-curves
+// Ported to C++ with modifications.
+
 #pragma once
 
 #include <array>
