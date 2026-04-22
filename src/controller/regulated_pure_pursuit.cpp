@@ -73,13 +73,14 @@ RegulatedPurePursuit::computeCommand(const geometry::Pose3d &curr_pose,
 
   best_v = std::clamp(v, min_feasible, max_feasible);
   best_w = std::clamp(k * best_v, -max_angular_vel_, max_angular_vel_);
+  // std::cerr << v << " " << linear_velocity << " " << min_feasible << " " << max_feasible << "\n";
 
   // auto dynamic_window_vels = applyDynamicWindow(linear_velocity, angular_velocity, v, k);
   // best_v = dynamic_window_vels.first;
   // best_w = dynamic_window_vels.second;
 
   if (checkCollision(curr_pose, best_v, best_w, lookahead_dist)) {
-    std::cout << "Collision Detected\n";
+    std::cerr << "Collision Detected\n";
     return {linear_velocity, angular_velocity};
   }
 

@@ -56,10 +56,11 @@ public:
 
     cmd_vel_pub_ = create_publisher<geometry_msgs::msg::Twist>("cmd_vel", 10);
     path_pub_ = create_publisher<nav_msgs::msg::Path>("path_pub", 10);
-    footprint_pub_ = create_publisher<visualization_msgs::msg::Marker>("footprint_pub", 10);
+    footprint_pub_ = create_publisher<visualization_msgs::msg::MarkerArray>("footprint_pub", 10);
     global_costmap_pub_ = create_publisher<nav_msgs::msg::OccupancyGrid>("global_costmap_pub", 10);
     local_costmap_pub_ = create_publisher<nav_msgs::msg::OccupancyGrid>("local_costmap_pub", 10);
-    lookahead_pose_pub_ = create_publisher<visualization_msgs::msg::Marker>("lookahead_pub", 10);
+    lookahead_pub_ = create_publisher<visualization_msgs::msg::Marker>("lookahead_pub", 10);
+    trajectory_pub_ = create_publisher<visualization_msgs::msg::MarkerArray>("trajectory_pub", 10);
 
     auto local_costmap_period = std::chrono::milliseconds(
         static_cast<int>(1000.0 / local_costmap_frequency_));
@@ -246,7 +247,10 @@ private:
       marker.points.push_back(p);
     }
 
-    footprint_pub_->publish(marker);
+    visualization_msgs::msg::MarkerArray footprint_marker_arr;
+    footprint_marker_arr.markers.push_back(marker);
+
+    footprint_pub_->publish(footprint_marker_arr);
   }
 
   void globalCostmapCallback() {
@@ -317,6 +321,12 @@ private:
     local_costmap_pub_->publish(local_costmap_msg_);
 
     collision_checker_.setParameters(&global_costmap_, &local_costmap_, robot_radius_);
+
+    // if (collision_checker_.inCollisionGlobal(geometry::Pose2d(start_x, start_y)))
+    //   RCLCPP_INFO(get_logger(), "In collision global");
+    //
+    // if (collision_checker_.inCollisionLocal(geometry::Pose2d(start_x, start_y)))
+    //   RCLCPP_INFO(get_logger(), "In collision local");
   }
 
   void plannerCallback() {
@@ -412,33 +422,89 @@ private:
 
     geometry::Pose2d lookahead_point = controller_.getLookaheadPoint();
 
-    visualization_msgs::msg::Marker marker;
+    visualization_msgs::msg::Marker lookahead_marker;
 
-    marker.header.frame_id = latest_map_->header.frame_id;
-    marker.header.stamp = get_clock()->now();
+    lookahead_marker.header.frame_id = latest_map_->header.frame_id;
+    lookahead_marker.header.stamp = get_clock()->now();
 
-    marker.ns = "lookahead";
-    marker.id = 0;
+    lookahead_marker.ns = "lookahead";
+    lookahead_marker.id = 0;
 
-    marker.type = visualization_msgs::msg::Marker::SPHERE;
-    marker.action = visualization_msgs::msg::Marker::ADD;
+    lookahead_marker.type = visualization_msgs::msg::Marker::SPHERE;
+    lookahead_marker.action = visualization_msgs::msg::Marker::ADD;
 
-    marker.pose.position.x = lookahead_point.x;
-    marker.pose.position.y = lookahead_point.y;
-    marker.pose.position.z = 0.0;
+    lookahead_marker.pose.position.x = lookahead_point.x;
+    lookahead_marker.pose.position.y = lookahead_point.y;
+    lookahead_marker.pose.position.z = 0.0;
 
-    marker.scale.x = 0.2;
-    marker.scale.y = 0.2;
-    marker.scale.z = 0.2;
+    lookahead_marker.scale.x = 0.2;
+    lookahead_marker.scale.y = 0.2;
+    lookahead_marker.scale.z = 0.2;
 
-    marker.color.r = 1.0;
-    marker.color.g = 0.0;
-    marker.color.b = 0.5;
-    marker.color.a = 1.0;
+    lookahead_marker.color.r = 1.0;
+    lookahead_marker.color.g = 0.0;
+    lookahead_marker.color.b = 0.5;
+    lookahead_marker.color.a = 1.0;
 
-    marker.lifetime = rclcpp::Duration::from_seconds(0);
+    lookahead_marker.lifetime = rclcpp::Duration::from_seconds(0);
 
-    lookahead_pose_pub_->publish(marker);
+    lookahead_pub_->publish(lookahead_marker);
+
+    std::vector<visualization_msgs::msg::Marker> trajectory_markers;
+
+    double sim_x = start_x_;
+    double sim_y = start_y_;
+    double sim_theta = start_theta_;
+
+    double dt = 1.0 / controller_params_.controller_frequency;
+
+    double sim_time = 0.0;
+    int i = 0;
+
+    while (sim_time < controller_params_.sim_time) {
+      sim_x += v * trig_table_.cos(sim_theta) * dt;
+      sim_y += v * trig_table_.sin(sim_theta) * dt;
+      sim_theta += w * dt;
+
+      visualization_msgs::msg::Marker marker;
+
+      marker.header.frame_id = latest_map_->header.frame_id;
+      marker.header.stamp = get_clock()->now();
+
+      marker.ns = "trajectory";
+      marker.id = i++;
+
+      marker.type = visualization_msgs::msg::Marker::ARROW;
+      marker.action = visualization_msgs::msg::Marker::ADD;
+
+      marker.pose.position.x = sim_x;
+      marker.pose.position.y = sim_y;
+      marker.pose.position.z = 0.0;
+
+      tf2::Quaternion q;
+      q.setRPY(0, 0, sim_theta);
+      marker.pose.orientation = tf2::toMsg(q);
+
+      marker.scale.x = 0.3;
+      marker.scale.y = 0.05;
+      marker.scale.z = 0.05;
+
+      double t = sim_time / controller_params_.sim_time;
+
+      marker.color.r = 1.0 - t;
+      marker.color.g = t;
+      marker.color.b = 0.0;
+      marker.color.a = 1.0;
+
+      marker.lifetime = rclcpp::Duration::from_seconds(0);
+      trajectory_markers.push_back(marker);
+      sim_time += dt;
+    }
+
+    visualization_msgs::msg::MarkerArray marker_array;
+    marker_array.markers = trajectory_markers;
+
+    trajectory_pub_->publish(marker_array);
 
     geometry_msgs::msg::Twist cmd;
     cmd.linear.x = v;
@@ -459,10 +525,11 @@ private:
   rclcpp::Subscription<geometry_msgs::msg::PoseStamped>::SharedPtr goal_sub_;
 
   rclcpp::Publisher<nav_msgs::msg::Path>::SharedPtr path_pub_;
-  rclcpp::Publisher<visualization_msgs::msg::Marker>::SharedPtr footprint_pub_;
+  rclcpp::Publisher<visualization_msgs::msg::MarkerArray>::SharedPtr footprint_pub_;
   rclcpp::Publisher<nav_msgs::msg::OccupancyGrid>::SharedPtr global_costmap_pub_;
   rclcpp::Publisher<nav_msgs::msg::OccupancyGrid>::SharedPtr local_costmap_pub_;
-  rclcpp::Publisher<visualization_msgs::msg::Marker>::SharedPtr lookahead_pose_pub_;
+  rclcpp::Publisher<visualization_msgs::msg::Marker>::SharedPtr lookahead_pub_;
+  rclcpp::Publisher<visualization_msgs::msg::MarkerArray>::SharedPtr trajectory_pub_;
   rclcpp::Publisher<geometry_msgs::msg::Twist>::SharedPtr cmd_vel_pub_;
 
   nav_msgs::msg::OccupancyGrid::SharedPtr latest_map_;

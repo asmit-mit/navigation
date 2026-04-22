@@ -26,6 +26,7 @@ def generate_launch_description():
                 ('global_costmap_pub', '/nav/costmap/global_costmap'),
                 ('local_costmap_pub', '/nav/costmap/local_costmap'),
                 ('lookahead_pub', '/nav/controller/lookahead_pose'),
+                ('trajectory_pub', '/nav/controller/trajectory'),
             ]
         )
     ])
