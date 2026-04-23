@@ -2,33 +2,33 @@ navigation:
   ros__parameters:
     global_costmap:
       frequency: 1
-      inflation_radius: 0.8
-      inscribed_radius: 0.2
-      scaling_factor: 5.0
+      inflation_radius: 0.55
+      inscribed_radius: 0.11
+      scaling_factor: 3.0
 
     local_costmap:
       frequency: 5
-      window_size: 12.0
-      inflation_radius: 0.6
-      inscribed_radius: 0.2
-      scaling_factor: 1.0
+      window_size: 3.0
+      inflation_radius: 1.0
+      inscribed_radius: 0.11
+      scaling_factor: 3.0
 
     collision_checker:
-      robot_radius: 0.45
+      robot_radius: 0.12
 
     planner:
-      frequency: 5
-      max_linear_velocity: 1.5
+      frequency: 10
+      max_linear_velocity: 1.0
       max_angular_velocity: 2.0
       angular_resolution: 5.0
       angular_tolerance: 0.2
       distance_tolerance: 0.2
       analytical_expansion_ratio: 3.5
       analytical_expansion_max_length: 3.0
-      steering_penalty: 0.5
+      steering_penalty: 0.8
       change_steering_penalty: 0.3
       reverse_penalty: 2.0
-      cost_penalty: 8.0
+      cost_penalty: 12.0
       expansion_cost: 200.0
       path_length_weight: 0.985
       max_explore_iterations: 50000
@@ -39,18 +39,18 @@ navigation:
         data_weight: 0.2
 
     controller:
-      frequency: 5
-      max_linear_velocity: 1.5
+      frequency: 10
+      max_linear_velocity: 1.0
       max_angular_velocity: 2.0
       max_linear_acceleration: 0.8
-      max_angular_acceleration: 1.5
+      max_angular_acceleration: 2.3
       sim_time: 1.0
-      lookahead_distance: 1.0
-      lookahead_gain: 1.0
-      max_lookahead_distance: 1.5
-      min_lookahead_distance: 0.5
-      proximity_distance: 0.1
-      proximity_heuristic_scale: 0.3
+      lookahead_distance: 0.6
+      lookahead_gain: 1.5
+      max_lookahead_distance: 0.9
+      min_lookahead_distance: 0.3
+      proximity_distance: 0.3
+      proximity_heuristic_scale: 1.0
       approach_velocity_scaling_dist: 1.0
       min_approach_linear_velocity: 0.05
       min_heading_angle_error: 0.785

@@ -17,7 +17,7 @@ def generate_launch_description():
             output='screen',
             parameters=[params_file],
             remappings=[
-                ('map_sub', '/perception/map'),
+                ('map_sub', '/map'),
                 ('goal_sub', '/goal_pose'),
                 ('odom_sub', '/odom'),
                 ('cmd_vel', '/cmd_vel'),
