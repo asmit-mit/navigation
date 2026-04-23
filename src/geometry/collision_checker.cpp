@@ -2,7 +2,6 @@
 #include "utils/grid_utils.h"
 
 #include <cmath>
-#include <iostream>
 
 namespace geometry {
 
@@ -46,10 +45,10 @@ bool CollisionChecker::inCollisionGlobal(const Pose2d &robot_pose) const {
   size_t size_x = global_costmap_->getWidth();
   size_t size_y = global_costmap_->getHeight();
 
-  size_t min_x = std::max(0, rx - half_w);
-  size_t max_x = std::min(size_x - 1, (size_t)rx + half_w);
-  size_t min_y = std::max(0, ry - half_h);
-  size_t max_y = std::min(size_y - 1, (size_t)ry + half_h);
+  size_t min_x = std::max(0, (int)rx - half_w);
+  size_t max_x = std::min((int)size_x - 1, rx + half_w);
+  size_t min_y = std::max(0, (int)ry - half_h);
+  size_t max_y = std::min((int)size_y - 1, ry + half_h);
 
   for (size_t x = min_x; x <= max_x; x++) {
     for (size_t y = min_y; y <= max_y; y++) {
@@ -68,7 +67,7 @@ bool CollisionChecker::inCollisionLocal(const Pose2d &robot_pose) const {
                                             robot_pose.y,
                                             local_costmap_->getWindowOriginX(),
                                             local_costmap_->getWindowOriginY(),
-                                            global_costmap_->getResolution());
+                                            local_costmap_->getResolution());
 
   int half_w = robot_width_pixels_ / 2;
   int half_h = robot_height_pixels_ / 2;
@@ -76,10 +75,10 @@ bool CollisionChecker::inCollisionLocal(const Pose2d &robot_pose) const {
   size_t size_x = local_costmap_->getWindowWidth();
   size_t size_y = local_costmap_->getWindowHeight();
 
-  size_t min_x = std::max(0, rx - half_w);
-  size_t max_x = std::min(size_x - 1, (size_t)rx + half_w);
-  size_t min_y = std::max(0, ry - half_h);
-  size_t max_y = std::min(size_y - 1, (size_t)ry + half_h);
+  size_t min_x = std::max(0, (int)rx - half_w);
+  size_t max_x = std::min((int)size_x - 1, rx + half_w);
+  size_t min_y = std::max(0, (int)ry - half_h);
+  size_t max_y = std::min((int)size_y - 1, ry + half_h);
 
   for (size_t x = min_x; x <= max_x; x++) {
     for (size_t y = min_y; y <= max_y; y++) {

@@ -152,7 +152,7 @@ private:
     get_parameter("planner.optimizer.smooth_weight", optimizer_smooth_weight_);
     get_parameter("planner.optimizer.data_weight", optimizer_data_weight_);
 
-    declare_parameter("controller.controller_frequency", 20);
+    declare_parameter("controller.frequency", 20);
     declare_parameter("controller.max_linear_velocity", 1.0);
     declare_parameter("controller.max_angular_velocity", 2.0);
     declare_parameter("controller.max_linear_acceleration", 1.0);
@@ -169,7 +169,7 @@ private:
     declare_parameter("controller.min_heading_angle_error", 0.785);
     declare_parameter("controller.distance_tolerance", 0.1);
 
-    get_parameter("controller.controller_frequency", controller_params_.controller_frequency);
+    get_parameter("controller.frequency", controller_params_.controller_frequency);
     get_parameter("controller.max_linear_velocity", controller_params_.max_linear_velocity);
     get_parameter("controller.max_angular_velocity", controller_params_.max_angular_velocity);
     get_parameter("controller.max_linear_acceleration", controller_params_.max_linear_acceleration);
@@ -191,7 +191,10 @@ private:
     get_parameter("controller.distance_tolerance", controller_params_.distance_tolerance);
   }
 
-  void mapCallback(const nav_msgs::msg::OccupancyGrid::SharedPtr msg) { latest_map_ = msg; }
+  void mapCallback(const nav_msgs::msg::OccupancyGrid::SharedPtr msg) {
+    latest_map_ = msg;
+    have_map_ = true;
+  }
 
   void odomCallback(const nav_msgs::msg::Odometry::SharedPtr msg) {
     start_pose_.pose = msg->pose.pose;
@@ -208,7 +211,7 @@ private:
   }
 
   void footprintCallback() {
-    if (!have_start_ || !latest_map_)
+    if (!have_start_ || !have_map_)
       return;
 
     visualization_msgs::msg::Marker marker;
@@ -254,10 +257,11 @@ private:
   }
 
   void globalCostmapCallback() {
-    if (!latest_map_)
+    if (!have_map_)
       return;
 
     edt_.computeDT(latest_map_);
+    have_edt_ = true;
 
     global_costmap_.setParameters(latest_map_,
                                   &edt_,
@@ -286,7 +290,7 @@ private:
   }
 
   void localCostmapCallback() {
-    if (!have_start_)
+    if (!have_start_ || !have_map_ || !have_edt_)
       return;
 
     double start_x = start_pose_.pose.position.x;
@@ -564,6 +568,8 @@ private:
 
   bool have_start_ = false;
   bool have_goal_ = false;
+  bool have_map_ = false;
+  bool have_edt_ = false;
 
   int global_costmap_frequency_, local_costmap_frequency_, planner_frequency_;
 

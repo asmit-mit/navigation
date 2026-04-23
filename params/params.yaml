@@ -39,7 +39,7 @@ navigation:
         data_weight: 0.2
 
     controller:
-      controller_frequency: 5
+      frequency: 5
       max_linear_velocity: 1.5
       max_angular_velocity: 2.0
       max_linear_acceleration: 0.8
