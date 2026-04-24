@@ -44,7 +44,7 @@ double MotionModel::getOptimalDistance() {
   }
 }
 
-std::vector<geometry::Pose2d> MotionModel::getOptimalPath() {
+std::vector<geometry::Pose3d> MotionModel::getOptimalPath() {
   if (type_ == MotionModelType::DUBINS) {
     return dubins_.getOptimalPath();
   } else {

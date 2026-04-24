@@ -542,7 +542,7 @@ private:
 
   geometry_msgs::msg::PoseStamped start_pose_;
   geometry_msgs::msg::PoseStamped goal_pose_;
-  std::vector<geometry::Pose2d> path_;
+  std::vector<geometry::Pose3d> path_;
 
   utils::EDT edt_;
   utils::TrigTable trig_table_ = utils::TrigTable(10000);

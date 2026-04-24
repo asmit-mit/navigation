@@ -7,8 +7,8 @@
 #include <array>
 #include <vector>
 
-#include "planner/motion_states.h"
 #include "geometry/pose.h"
+#include "planner/motion_states.h"
 #include "utils/trig_utils.h"
 
 namespace planner {
@@ -23,7 +23,7 @@ public:
   void setMinTurningRadius(double min_radius);
   void simulate(const geometry::Pose3d &start, const geometry::Pose3d &end);
   double getOptimalDistance();
-  std::vector<geometry::Pose2d> getOptimalPath();
+  std::vector<geometry::Pose3d> getOptimalPath();
 
 private:
   struct PathElement {
@@ -45,8 +45,7 @@ private:
         steering = Steering::LEFT;
     }
 
-    PathElement()
-        : param(0), steering(Steering::STRAIGHT), gear(Gear::FORWARD) {}
+    PathElement() : param(0), steering(Steering::STRAIGHT), gear(Gear::FORWARD) {}
     PathElement(double p, Steering s, Gear g) {
       if (p >= 0) {
         param = p;
@@ -93,11 +92,18 @@ private:
 
   using pathFn = void (ReedShepps::*)(const geometry::Pose3d &, bool, bool);
 
-  const std::array<pathFn, 12> pathFns = {
-      &ReedShepps::path1,  &ReedShepps::path2,  &ReedShepps::path3,
-      &ReedShepps::path4,  &ReedShepps::path5,  &ReedShepps::path6,
-      &ReedShepps::path7,  &ReedShepps::path8,  &ReedShepps::path9,
-      &ReedShepps::path10, &ReedShepps::path11, &ReedShepps::path12};
+  const std::array<pathFn, 12> pathFns = {&ReedShepps::path1,
+                                          &ReedShepps::path2,
+                                          &ReedShepps::path3,
+                                          &ReedShepps::path4,
+                                          &ReedShepps::path5,
+                                          &ReedShepps::path6,
+                                          &ReedShepps::path7,
+                                          &ReedShepps::path8,
+                                          &ReedShepps::path9,
+                                          &ReedShepps::path10,
+                                          &ReedShepps::path11,
+                                          &ReedShepps::path12};
 };
 
 }; // namespace planner

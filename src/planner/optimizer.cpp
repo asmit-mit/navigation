@@ -15,11 +15,11 @@ void Optimizer::setWeights(double smooth, double data) {
 
 void Optimizer::setIterations(int iterations) { iterations_ = iterations; }
 
-std::vector<geometry::Pose2d> Optimizer::getSmoothPath(std::vector<geometry::Pose2d> &plan) const {
+std::vector<geometry::Pose3d> Optimizer::getSmoothPath(std::vector<geometry::Pose3d> &plan) const {
   if (plan.size() < 3)
     return plan;
 
-  std::vector<geometry::Pose2d> new_path = plan;
+  std::vector<geometry::Pose3d> new_path = plan;
 
   for (int iter = 0; iter < iterations_; iter++) {
     double change = 0.0;
@@ -49,6 +49,10 @@ std::vector<geometry::Pose2d> Optimizer::getSmoothPath(std::vector<geometry::Pos
 
       new_path[i].x = new_x;
       new_path[i].y = new_y;
+
+      double dx = new_path[i + 1].x - new_path[i - 1].x;
+      double dy = new_path[i + 1].y - new_path[i - 1].y;
+      new_path[i].theta = std::atan2(dy, dx);
     }
 
     if (change < epsilon_)

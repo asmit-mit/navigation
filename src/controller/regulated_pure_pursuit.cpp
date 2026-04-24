@@ -44,7 +44,7 @@ RegulatedPurePursuit::computeCommand(const geometry::Pose3d &curr_pose,
                                      const geometry::Pose3d &goal_pose,
                                      double linear_velocity,
                                      double angular_velocity,
-                                     const std::vector<geometry::Pose2d> &plan) {
+                                     const std::vector<geometry::Pose3d> &plan) {
   if (shouldRotateToGoalHeading(curr_pose, goal_pose)) {
     double angle_to_goal = utils::M(goal_pose.theta - curr_pose.theta);
     return rotateToHeading(angle_to_goal, angular_velocity);
@@ -54,6 +54,8 @@ RegulatedPurePursuit::computeCommand(const geometry::Pose3d &curr_pose,
     return {0.0, 0.0};
 
   double lookahead_dist = computeLookaheadDistance(linear_velocity);
+  lookahead_dist = computeCuspDistance(lookahead_dist, plan);
+
   lookahead_point_ = findLookaheadPoint(curr_pose, plan, lookahead_dist);
 
   double angle_to_lookahead = angleToTarget(curr_pose, lookahead_point_);
@@ -61,6 +63,9 @@ RegulatedPurePursuit::computeCommand(const geometry::Pose3d &curr_pose,
     return rotateToHeading(angle_to_lookahead, angular_velocity);
 
   double k = computeCurvature(curr_pose, lookahead_point_);
+
+  // double sign = k >= 0 ? 1.0 : -1.0;
+  double sign = 1.0;
 
   double v = max_linear_vel_;
   v = std::min(v, regulateByCurvature(v, k));
@@ -71,13 +76,8 @@ RegulatedPurePursuit::computeCommand(const geometry::Pose3d &curr_pose,
   const double min_feasible = linear_velocity - max_linear_accel_ * dt_;
   const double max_feasible = linear_velocity + max_linear_accel_ * dt_;
 
-  best_v = std::clamp(v, min_feasible, max_feasible);
+  best_v = sign * std::clamp(v, min_feasible, max_feasible);
   best_w = std::clamp(k * best_v, -max_angular_vel_, max_angular_vel_);
-  // std::cerr << v << " " << linear_velocity << " " << min_feasible << " " << max_feasible << "\n";
-
-  // auto dynamic_window_vels = applyDynamicWindow(linear_velocity, angular_velocity, v, k);
-  // best_v = dynamic_window_vels.first;
-  // best_w = dynamic_window_vels.second;
 
   if (checkCollision(curr_pose, best_v, best_w, lookahead_dist)) {
     std::cerr << "Collision Detected\n";
@@ -87,8 +87,8 @@ RegulatedPurePursuit::computeCommand(const geometry::Pose3d &curr_pose,
   return {best_v, best_w};
 }
 
-geometry::Pose2d RegulatedPurePursuit::findLookaheadPoint(const geometry::Pose3d &curr_pose,
-                                                          const std::vector<geometry::Pose2d> &plan,
+geometry::Pose3d RegulatedPurePursuit::findLookaheadPoint(const geometry::Pose3d &curr_pose,
+                                                          const std::vector<geometry::Pose3d> &plan,
                                                           double lookahead_dist) const {
   size_t closest_idx = 0;
   double min_dist = std::numeric_limits<double>::max();
@@ -109,10 +109,10 @@ geometry::Pose2d RegulatedPurePursuit::findLookaheadPoint(const geometry::Pose3d
   return plan.back();
 }
 
-geometry::Pose2d RegulatedPurePursuit::getLookaheadPoint() const { return lookahead_point_; }
+geometry::Pose3d RegulatedPurePursuit::getLookaheadPoint() const { return lookahead_point_; }
 
 double RegulatedPurePursuit::computeCurvature(const geometry::Pose3d &curr_pose,
-                                              const geometry::Pose2d &lookahead_point) const {
+                                              const geometry::Pose3d &lookahead_point) const {
   double dx = lookahead_point.x - curr_pose.x;
   double dy = lookahead_point.y - curr_pose.y;
   double theta = curr_pose.theta;
@@ -148,7 +148,7 @@ double RegulatedPurePursuit::regulateByCostmap(double v, const geometry::Pose3d 
 }
 
 double RegulatedPurePursuit::regulateByGoalProximity(
-    double v, const geometry::Pose3d &curr_pose, const std::vector<geometry::Pose2d> &plan) const {
+    double v, const geometry::Pose3d &curr_pose, const std::vector<geometry::Pose3d> &plan) const {
   double dist_to_goal = utils::distance(curr_pose, plan.back());
   if (dist_to_goal >= approach_velocity_scaling_dist_)
     return v;
@@ -162,7 +162,7 @@ double RegulatedPurePursuit::regulateByGoalProximity(
 }
 
 double RegulatedPurePursuit::angleToTarget(const geometry::Pose3d &curr_pose,
-                                           const geometry::Pose2d &target) const {
+                                           const geometry::Pose3d &target) const {
   double dx = target.x - curr_pose.x;
   double dy = target.y - curr_pose.y;
   double bearing = std::atan2(dy, dx);
@@ -186,7 +186,7 @@ std::pair<double, double> RegulatedPurePursuit::rotateToHeading(double angle_to_
 }
 
 bool RegulatedPurePursuit::shouldRotateToGoalHeading(const geometry::Pose3d &curr_pose,
-                                                     const geometry::Pose2d &goal) const {
+                                                     const geometry::Pose3d &goal) const {
   return utils::distance(curr_pose, goal) < distance_tolerance_ * 2.0;
 }
 
@@ -222,6 +222,46 @@ bool RegulatedPurePursuit::checkCollision(const geometry::Pose3d &curr_pose,
 double RegulatedPurePursuit::computeLookaheadDistance(double linear_velocity) const {
   return std::clamp(
       lookahead_gain_ * linear_velocity, min_lookahead_distance_, max_lookahead_distance_);
+}
+
+double RegulatedPurePursuit::computeCuspDistance(double lookahead_dist,
+                                                 const std::vector<geometry::Pose3d> &plan) {
+  double distance = 0.0;
+
+  for (size_t i = 1; i < plan.size() - 1; ++i) {
+    auto &p0 = plan[i - 1];
+    auto &p1 = plan[i];
+    auto &p2 = plan[i + 1];
+
+    double v1x = p1.x - p0.x;
+    double v1y = p1.y - p0.y;
+
+    double v2x = p2.x - p1.x;
+    double v2y = p2.y - p1.y;
+
+    double mag1 = std::hypot(v1x, v1y);
+    double mag2 = std::hypot(v2x, v2y);
+
+    if (mag1 == 0 || mag2 == 0)
+      continue;
+
+    v1x /= mag1;
+    v1y /= mag1;
+    v2x /= mag2;
+    v2y /= mag2;
+
+    double dot = v1x * v2x + v1y * v2y;
+
+    distance += mag1;
+
+    if (dot < 0.0)
+      return distance;
+
+    if (distance > lookahead_dist)
+      return lookahead_dist;
+  }
+
+  return std::numeric_limits<double>::infinity();
 }
 
 } // namespace controller

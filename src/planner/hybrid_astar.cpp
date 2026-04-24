@@ -109,7 +109,7 @@ void HybridAStar::setStart(double x, double y, double theta) {
   start_ = geometry::Pose3d(x, y, theta);
 }
 
-std::vector<geometry::Pose2d> HybridAStar::getPlan() {
+std::vector<geometry::Pose3d> HybridAStar::getPlan() {
   simulate();
   plan_ = optimizer_->getSmoothPath(plan_);
   return plan_;
@@ -241,7 +241,7 @@ void HybridAStar::simulate() {
     }
 
     if (accumulator >= analytical_expansion_ratio_) {
-      std::vector<geometry::Pose2d> analytical_expansion = analyticalExpansion(curr);
+      std::vector<geometry::Pose3d> analytical_expansion = analyticalExpansion(curr);
       if (!analytical_expansion.empty()) {
         while (curr) {
           plan_.push_back(curr->pose);
@@ -296,14 +296,14 @@ void HybridAStar::simulate() {
   }
 }
 
-std::vector<geometry::Pose2d> HybridAStar::analyticalExpansion(const Node *node) {
+std::vector<geometry::Pose3d> HybridAStar::analyticalExpansion(const Node *node) {
   motion_model_->simulate(node->pose, end_);
 
   const double mm_dist = motion_model_->getOptimalDistance();
   if (mm_dist >= analytical_expansion_max_length_)
     return {};
 
-  std::vector<geometry::Pose2d> mm_path = motion_model_->getOptimalPath();
+  std::vector<geometry::Pose3d> mm_path = motion_model_->getOptimalPath();
   if (mm_path.empty())
     return {};
 

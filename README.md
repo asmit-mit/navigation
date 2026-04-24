@@ -27,61 +27,62 @@ This project implements a minimal but fully functional navigation stack comprisi
 ```yaml
 navigation:
   ros__parameters:
+
     global_costmap:
-      frequency: 1
-      inflation_radius: 0.55
-      inscribed_radius: 0.11
-      scaling_factor: 3.0
+      frequency: 1                          # Global costmap update frequency
+      inflation_radius: 0.55                # Distance obstacles are "expanded" for safety buffer (meters)
+      inscribed_radius: 0.11                # Robot's inner radius (used for collision checks) (meters)
+      scaling_factor: 3.0                   # How quickly cost decays from obstacles (higher = sharper drop)
 
     local_costmap:
       frequency: 5
-      window_size: 3.0
+      window_size: 3.0                      # Size of local rolling window around robot (meters)
       inflation_radius: 1.0
       inscribed_radius: 0.11
       scaling_factor: 3.0
-
+    
     collision_checker:
-      robot_radius: 0.12
+      robot_radius: 0.12                    # robot radius used for collision checks (meters)
 
     planner:
-      frequency: 10
-      max_linear_velocity: 1.0
-      max_angular_velocity: 2.0
-      angular_resolution: 5.0
-      angular_tolerance: 0.2
-      distance_tolerance: 0.2
-      analytical_expansion_ratio: 3.5
-      analytical_expansion_max_length: 3.0
-      steering_penalty: 0.8
-      change_steering_penalty: 0.3
-      reverse_penalty: 2.0
-      cost_penalty: 12.0
-      expansion_cost: 200.0
-      path_length_weight: 0.985
-      max_explore_iterations: 50000
-      motion_model: "DUBINS"
+      frequency: 5                          # Path Planning frequency
+      max_linear_velocity: 1.0              # Max speed used for planning (not actual execution limit) (m/s)
+      max_angular_velocity: 2.0             # Max turning rate for planning (rad/s)
+      angular_resolution: 5.0               # Degrees per discretized heading (lower = more precise but slower)
+      angular_tolerance: 0.2                # Acceptable orientation error at goal (radians)
+      distance_tolerance: 0.2               # Acceptable positional error at goal (meters)
+      analytical_expansion_ratio: 3.5       # How often to attempt shortcut (Reeds-Shepp/Dubins) (lower = more attempts for shortcut)
+      analytical_expansion_max_length: 3.0  # Max length of shortcut connection (meters)
+      expansion_cost: 200.0                 # Maximum cost threshold allowed in shortcut path
+      steering_penalty: 1.3                 # Penalizes turning (prefers straight motion) (should be >= 1.0)
+      change_steering_penalty: 1.8          # Penalizes switching left to right turns (reduces zig-zag in path) (should be >= 1.0)
+      reverse_penalty: 2.1                  # Penalizes reversing (higher = fewer cusps) (should be >= 1.0)
+      cost_penalty: 2.0                     # Weight for costmap values (obstacle proximity influence)
+      path_length_weight: 0.985             # Weight for path length vs other costs (closer to 1 = shorter paths) (should be <= 1.0)
+      max_explore_iterations: 50000         # Hard cap on A* expansions (prevents infinite search)
+      motion_model: "DUBINS"                # "DUBINS": no reversing | "REED_SHEPPS": reversing allowed
       optimizer:
-        iterations: 1000
-        smooth_weight: 0.3
-        data_weight: 0.2
+        iterations: 1000                    # Number of smoothing iterations
+        smooth_weight: 0.3                  # Weight for smoothness (higher = smoother, less accurate)
+        data_weight: 0.2                    # Weight for matching original
 
     controller:
-      frequency: 10
-      max_linear_velocity: 1.0
-      max_angular_velocity: 2.0
-      max_linear_acceleration: 0.8
-      max_angular_acceleration: 2.3
-      sim_time: 1.0
-      lookahead_distance: 0.6
-      lookahead_gain: 1.5
-      max_lookahead_distance: 0.9
-      min_lookahead_distance: 0.3
-      proximity_distance: 0.3
-      proximity_heuristic_scale: 1.0
-      approach_velocity_scaling_dist: 1.0
-      min_approach_linear_velocity: 0.05
-      min_heading_angle_error: 0.785
-      distance_tolerance: 0.1
+      frequency: 10                         # Control loop frequency
+      max_linear_velocity: 1.0              # Max forward speed (m/s)
+      max_angular_velocity: 2.0             # Max turning speed (rad/s)
+      max_linear_acceleration: 0.8          # Linear acceleration (m/s2)
+      max_angular_acceleration: 2.3         # Angular acceleration (rad/s2)
+      sim_time: 1.0                         # Time horizon (in seconds) for collision checking
+      lookahead_distance: 0.6               # Base lookahead distance (meters)
+      lookahead_gain: 1.5                   # Scale to change lookahead distance with speed
+      max_lookahead_distance: 0.9           # Upper bound for lookeahed distance
+      min_lookahead_distance: 0.3           # Lower bound for lookeahed distance
+      proximity_distance: 0.3               # Distance from obstacle to start slowing down (meters)
+      proximity_heuristic_scale: 1.0        # Strength of obstacle slowdown effect
+      approach_velocity_scaling_dist: 1.0   # Distance from goal to start slowing down
+      min_approach_linear_velocity: 0.05    # Minimum crawl speed near goal (m/s)
+      min_heading_angle_error: 0.785        # ~45°. If error > this → rotate in place (radians)
+      distance_tolerance: 0.1               # When goal is considered reached (meters)
 ```
 
 ## References
