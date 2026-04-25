@@ -9,13 +9,50 @@ endif()
 find_package(ament_cmake REQUIRED)
 find_package(rclcpp REQUIRED)
 find_package(nav_msgs REQUIRED)
-find_package(nav_msgs REQUIRED)
 find_package(visualization_msgs REQUIRED)
 find_package(geometry_msgs REQUIRED)
 find_package(tf2 REQUIRED)
 find_package(tf2_ros REQUIRED)
 find_package(tf2_geometry_msgs REQUIRED)
 
+add_executable(test_planner
+  src/test_planner.cpp
+
+  src/grid/global_costmap.cpp 
+  src/grid/local_costmap.cpp 
+  src/grid/grid.cpp
+
+  src/geometry/pose.cpp
+  src/geometry/state.cpp
+  src/geometry/collision_checker.cpp
+
+  src/planner/hybrid_astar.cpp
+  src/planner/reed_shepps.cpp
+  src/planner/dubins.cpp
+  src/planner/motion_model.cpp
+  src/planner/optimizer.cpp
+
+  src/controller/regulated_pure_pursuit.cpp
+
+  src/utils/DSU.cpp
+  src/utils/EDT.cpp
+  src/utils/math_utils.cpp
+  src/utils/grid_utils.cpp
+  src/utils/trig_utils.cpp)
+target_include_directories(test_planner PUBLIC
+  $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+  $<INSTALL_INTERFACE:include>)
+target_compile_features(test_planner PUBLIC c_std_99 cxx_std_17)  # Require C99 and C++17
+ament_target_dependencies(
+  test_planner
+  rclcpp
+  nav_msgs
+  geometry_msgs
+  visualization_msgs
+  tf2
+  tf2_ros
+  tf2_geometry_msgs
+)
 
 add_executable(navigation 
   src/navigation.cpp 
@@ -56,13 +93,10 @@ ament_target_dependencies(
   tf2_geometry_msgs
 )
 
-install(TARGETS navigation
+install(TARGETS navigation test_planner
   DESTINATION lib/${PROJECT_NAME})
 
-install(DIRECTORY params
-  DESTINATION share/${PROJECT_NAME})
-
-install(DIRECTORY launch
+install(DIRECTORY params launch maps
   DESTINATION share/${PROJECT_NAME})
 
 if(BUILD_TESTING)
