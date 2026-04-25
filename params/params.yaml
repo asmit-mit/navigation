@@ -3,18 +3,18 @@ navigation:
     global_costmap:
       frequency: 1
       inflation_radius: 0.55
-      inscribed_radius: 0.11
+      inscribed_radius: 0.1
       scaling_factor: 3.0
 
     local_costmap:
       frequency: 5
       window_size: 3.0
       inflation_radius: 1.0
-      inscribed_radius: 0.11
+      inscribed_radius: 0.1
       scaling_factor: 3.0
 
     collision_checker:
-      robot_radius: 0.12
+      robot_radius: 0.1
 
     planner:
       frequency: 5
@@ -31,7 +31,7 @@ navigation:
       cost_penalty: 2.0
       expansion_cost: 200.0
       path_length_weight: 0.985
-      max_explore_iterations: 50000
+      max_explore_iterations: 1000000
       motion_model: "DUBINS"
       optimizer:
         iterations: 1000
@@ -51,7 +51,7 @@ navigation:
       min_lookahead_distance: 0.3
       proximity_distance: 0.3
       proximity_heuristic_scale: 1.0
-      approach_velocity_scaling_dist: 1.0
+      approach_velocity_scaling_dist: 1.5
       min_approach_linear_velocity: 0.05
       min_heading_angle_error: 0.785
       distance_tolerance: 0.1

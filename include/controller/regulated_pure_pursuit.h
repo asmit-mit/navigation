@@ -27,7 +27,8 @@ public:
   geometry::Pose3d getLookaheadPoint() const;
 
 private:
-  geometry::Pose3d findLookaheadPoint(const geometry::Pose3d &curr_pose,
+  geometry::Pose3d findLookaheadPoint(size_t closest_idx,
+                                      const geometry::Pose3d &curr_pose,
                                       const std::vector<geometry::Pose3d> &plan,
                                       double lookahead_dist) const;
   double computeCurvature(const geometry::Pose3d &curr_pose,
@@ -46,15 +47,18 @@ private:
                       double angular_velocity,
                       double lookahead_dist) const;
 
-  std::pair<double, double> applyDynamicWindow(double curr_linear_vel,
-                                               double curr_angular_vel,
-                                               double regulated_vel,
-                                               double curvature);
-
   std::pair<double, double> rotateToHeading(double angle_to_lookahead,
                                             double angular_velocity) const;
+  size_t findCosestIdx(const geometry::Pose3d &curr_pose,
+                       const std::vector<geometry::Pose3d> &plan);
   double computeLookaheadDistance(double linear_velocity) const;
-  double computeCuspDistance(double lookahead_dist, const std::vector<geometry::Pose3d> &plan);
+  double computeCuspDistance(const geometry::Pose3d &curr_pose,
+                             size_t closest_idx,
+                             double lookahead_dist,
+                             const std::vector<geometry::Pose3d> &plan);
+  double
+  computeDirectionSign(size_t idx, double last_sign, const std::vector<geometry::Pose3d> &plan);
+  bool isLookingTowards(const geometry::Pose3d &p0, const geometry::Pose3d &p1);
 
 private:
   double min_linear_vel_;

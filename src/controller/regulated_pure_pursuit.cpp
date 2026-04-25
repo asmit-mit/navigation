@@ -2,6 +2,7 @@
 #include "utils/math_utils.h"
 
 #include <iostream>
+#include <limits>
 
 namespace controller {
 
@@ -53,19 +54,24 @@ RegulatedPurePursuit::computeCommand(const geometry::Pose3d &curr_pose,
   if (plan.empty())
     return {0.0, 0.0};
 
-  double lookahead_dist = computeLookaheadDistance(linear_velocity);
-  lookahead_dist = computeCuspDistance(lookahead_dist, plan);
+  size_t closest_idx = findCosestIdx(curr_pose, plan);
 
-  lookahead_point_ = findLookaheadPoint(curr_pose, plan, lookahead_dist);
+  double lookahead_dist = computeLookaheadDistance(linear_velocity);
+  double cusp_dist = computeCuspDistance(curr_pose, closest_idx, lookahead_dist, plan);
+  lookahead_dist = std::min(lookahead_dist, cusp_dist);
+
+  lookahead_point_ = findLookaheadPoint(closest_idx, curr_pose, plan, lookahead_dist);
+
+  // double last_sign = (linear_velocity >= 0.0) ? 1.0 : -1.0;
+  // double sign = computeDirectionSign(closest_idx, last_sign, plan);
+  // std::cerr << "Sign:" << sign << "\n";
+
+  double sign = 1.0;
+  double k = sign * computeCurvature(curr_pose, lookahead_point_);
 
   double angle_to_lookahead = angleToTarget(curr_pose, lookahead_point_);
-  if (angle_to_lookahead > min_heading_angle_error_)
+  if (sign >= 0.0 && std::abs(angle_to_lookahead) > min_heading_angle_error_)
     return rotateToHeading(angle_to_lookahead, angular_velocity);
-
-  double k = computeCurvature(curr_pose, lookahead_point_);
-
-  // double sign = k >= 0 ? 1.0 : -1.0;
-  double sign = 1.0;
 
   double v = max_linear_vel_;
   v = std::min(v, regulateByCurvature(v, k));
@@ -87,9 +93,8 @@ RegulatedPurePursuit::computeCommand(const geometry::Pose3d &curr_pose,
   return {best_v, best_w};
 }
 
-geometry::Pose3d RegulatedPurePursuit::findLookaheadPoint(const geometry::Pose3d &curr_pose,
-                                                          const std::vector<geometry::Pose3d> &plan,
-                                                          double lookahead_dist) const {
+size_t RegulatedPurePursuit::findCosestIdx(const geometry::Pose3d &curr_pose,
+                                           const std::vector<geometry::Pose3d> &plan) {
   size_t closest_idx = 0;
   double min_dist = std::numeric_limits<double>::max();
   for (size_t i = 0; i < plan.size(); ++i) {
@@ -100,6 +105,13 @@ geometry::Pose3d RegulatedPurePursuit::findLookaheadPoint(const geometry::Pose3d
     }
   }
 
+  return closest_idx;
+}
+
+geometry::Pose3d RegulatedPurePursuit::findLookaheadPoint(size_t closest_idx,
+                                                          const geometry::Pose3d &curr_pose,
+                                                          const std::vector<geometry::Pose3d> &plan,
+                                                          double lookahead_dist) const {
   for (size_t i = closest_idx; i < plan.size(); ++i) {
     double dist = utils::distance(curr_pose, plan[i]);
     if (dist >= lookahead_dist)
@@ -223,45 +235,65 @@ double RegulatedPurePursuit::computeLookaheadDistance(double linear_velocity) co
   return std::clamp(
       lookahead_gain_ * linear_velocity, min_lookahead_distance_, max_lookahead_distance_);
 }
-
-double RegulatedPurePursuit::computeCuspDistance(double lookahead_dist,
+double RegulatedPurePursuit::computeCuspDistance(const geometry::Pose3d &curr_pose,
+                                                 size_t closest_idx,
+                                                 double lookahead_dist,
                                                  const std::vector<geometry::Pose3d> &plan) {
-  double distance = 0.0;
+  for (size_t i = closest_idx; i + 2 < plan.size(); ++i) {
 
-  for (size_t i = 1; i < plan.size() - 1; ++i) {
-    auto &p0 = plan[i - 1];
-    auto &p1 = plan[i];
-    auto &p2 = plan[i + 1];
+    double dx1 = plan[i + 1].x - plan[i].x;
+    double dy1 = plan[i + 1].y - plan[i].y;
 
-    double v1x = p1.x - p0.x;
-    double v1y = p1.y - p0.y;
+    double dx2 = plan[i + 2].x - plan[i + 1].x;
+    double dy2 = plan[i + 2].y - plan[i + 1].y;
 
-    double v2x = p2.x - p1.x;
-    double v2y = p2.y - p1.y;
+    double dot = dx1 * dx2 + dy1 * dy2;
 
-    double mag1 = std::hypot(v1x, v1y);
-    double mag2 = std::hypot(v2x, v2y);
+    double dist = utils::distance(curr_pose, plan[i]);
 
-    if (mag1 == 0 || mag2 == 0)
-      continue;
+    if (dot < 0)
+      return dist;
 
-    v1x /= mag1;
-    v1y /= mag1;
-    v2x /= mag2;
-    v2y /= mag2;
-
-    double dot = v1x * v2x + v1y * v2y;
-
-    distance += mag1;
-
-    if (dot < 0.0)
-      return distance;
-
-    if (distance > lookahead_dist)
+    if (dist >= lookahead_dist)
       return lookahead_dist;
   }
 
   return std::numeric_limits<double>::infinity();
+}
+
+bool RegulatedPurePursuit::isLookingTowards(const geometry::Pose3d &p0,
+                                            const geometry::Pose3d &p1) {
+  double dx = p0.x - p1.x;
+  double dy = p0.y - p1.y;
+
+  double hx = trig_table_->cos(p1.theta);
+  double hy = trig_table_->sin(p1.theta);
+
+  double dot = dx * hx + dy * hy;
+  return dot > 0;
+}
+
+double RegulatedPurePursuit::computeDirectionSign(size_t closest_idx,
+                                                  double last_sign,
+                                                  const std::vector<geometry::Pose3d> &plan) {
+  size_t look_ahead_idx = std::min(closest_idx + 3, plan.size() - 1);
+
+  double dx = plan[look_ahead_idx].x - plan[closest_idx].x;
+  double dy = plan[look_ahead_idx].y - plan[closest_idx].y;
+
+  double mag = std::sqrt(dx * dx + dy * dy);
+  if (mag < epsilon_)
+    return last_sign;
+
+  dx /= mag;
+  dy /= mag;
+
+  double hx = trig_table_->cos(plan[closest_idx].theta);
+  double hy = trig_table_->sin(plan[closest_idx].theta);
+
+  double dot = dx * hx + dy * hy;
+  last_sign = (dot >= 0.0) ? 1.0 : -1.0;
+  return last_sign;
 }
 
 } // namespace controller

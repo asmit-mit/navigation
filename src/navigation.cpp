@@ -400,6 +400,10 @@ private:
       pose_stamped.pose.position.y = pose.y;
       pose_stamped.pose.position.z = 0.0;
 
+      tf2::Quaternion q;
+      q.setRPY(0, 0, pose.theta);
+      pose_stamped.pose.orientation = tf2::toMsg(q);
+
       ros_path.poses.push_back(pose_stamped);
     }
 
@@ -421,7 +425,7 @@ private:
     auto [v, w] = controller_.computeCommand(
         start_pose, goal_pose, linear_velocity_, angular_velocity_, path_);
 
-    RCLCPP_INFO(get_logger(), "Distance to goal: %lf", utils::distance(start_pose, goal_pose));
+    // RCLCPP_INFO(get_logger(), "Distance to goal: %lf", utils::distance(start_pose, goal_pose));
     RCLCPP_INFO(get_logger(), "Publishing v: %lf and w: %lf", v, w);
 
     geometry::Pose2d lookahead_point = controller_.getLookaheadPoint();
