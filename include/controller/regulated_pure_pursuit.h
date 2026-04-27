@@ -23,23 +23,23 @@ public:
                                            const geometry::Pose3d &goal_pose,
                                            double linear_velocity,
                                            double angular_velocity,
-                                           const std::vector<geometry::Pose3d> &plan);
-  geometry::Pose3d getLookaheadPoint() const;
+                                           const std::vector<geometry::Pose2d> &plan);
+  geometry::Pose2d getLookaheadPoint() const;
 
 private:
-  geometry::Pose3d findLookaheadPoint(size_t closest_idx,
-                                      const geometry::Pose3d &curr_pose,
-                                      const std::vector<geometry::Pose3d> &plan,
-                                      double lookahead_dist) const;
+  geometry::Pose2d findLookaheadPoint(const geometry::Pose3d &curr_pose,
+                                      double lookahead_dist,
+                                      size_t closest_idx,
+                                      const std::vector<geometry::Pose2d> &plan) const;
   double computeCurvature(const geometry::Pose3d &curr_pose,
-                          const geometry::Pose3d &lookahead_point) const;
+                          const geometry::Pose2d &lookahead_point) const;
   double regulateByCurvature(double v, double curvature) const;
   double regulateByCostmap(double v, const geometry::Pose3d &curr_pose) const;
   double regulateByGoalProximity(double v,
                                  const geometry::Pose3d &curr_pose,
-                                 const std::vector<geometry::Pose3d> &plan) const;
+                                 const std::vector<geometry::Pose2d> &plan) const;
 
-  double angleToTarget(const geometry::Pose3d &curr_pose, const geometry::Pose3d &target) const;
+  double angleToTarget(const geometry::Pose3d &curr_pose, const geometry::Pose2d &target) const;
   bool shouldRotateToGoalHeading(const geometry::Pose3d &curr_pose,
                                  const geometry::Pose3d &goal) const;
   bool checkCollision(const geometry::Pose3d &curr_pose,
@@ -50,15 +50,13 @@ private:
   std::pair<double, double> rotateToHeading(double angle_to_lookahead,
                                             double angular_velocity) const;
   size_t findCosestIdx(const geometry::Pose3d &curr_pose,
-                       const std::vector<geometry::Pose3d> &plan);
+                       const std::vector<geometry::Pose2d> &plan);
+
   double computeLookaheadDistance(double linear_velocity) const;
   double computeCuspDistance(const geometry::Pose3d &curr_pose,
                              size_t closest_idx,
                              double lookahead_dist,
-                             const std::vector<geometry::Pose3d> &plan);
-  double
-  computeDirectionSign(size_t idx, double last_sign, const std::vector<geometry::Pose3d> &plan);
-  bool isLookingTowards(const geometry::Pose3d &p0, const geometry::Pose3d &p1);
+                             const std::vector<geometry::Pose2d> &plan);
 
 private:
   double min_linear_vel_;
@@ -82,7 +80,7 @@ private:
 
   static constexpr double epsilon_ = 1e-6;
 
-  geometry::Pose3d lookahead_point_;
+  geometry::Pose2d lookahead_point_;
   const grid::LocalCostmap *costmap_;
   const geometry::CollisionChecker *collision_checker_;
   const utils::TrigTable *trig_table_;

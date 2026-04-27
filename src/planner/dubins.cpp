@@ -72,8 +72,8 @@ void Dubins::simulate(const geometry::Pose3d &start, const geometry::Pose3d &end
 
 double Dubins::getOptimalDistance() { return optimal_path_dist_ * min_turning_radius_; }
 
-std::vector<geometry::Pose3d> Dubins::getOptimalPath() {
-  std::vector<geometry::Pose3d> poses;
+std::vector<geometry::Pose2d> Dubins::getOptimalPath() {
+  std::vector<geometry::Pose2d> poses;
   geometry::Pose3d curr = start_;
   poses.push_back(curr);
 

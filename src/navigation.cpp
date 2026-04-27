@@ -324,8 +324,6 @@ private:
     // RCLCPP_INFO(get_logger(), "Publishing Local Costmap");
     local_costmap_pub_->publish(local_costmap_msg_);
 
-    collision_checker_.setParameters(&global_costmap_, &local_costmap_, robot_radius_);
-
     // if (collision_checker_.inCollisionGlobal(geometry::Pose2d(start_x, start_y)))
     //   RCLCPP_INFO(get_logger(), "In collision global");
     //
@@ -336,6 +334,8 @@ private:
   void plannerCallback() {
     if (!latest_map_ || !have_start_ || !have_goal_)
       return;
+
+    collision_checker_.setParameters(&global_costmap_, &local_costmap_, robot_radius_);
 
     start_x_ = start_pose_.pose.position.x;
     start_y_ = start_pose_.pose.position.y;
@@ -400,10 +400,6 @@ private:
       pose_stamped.pose.position.y = pose.y;
       pose_stamped.pose.position.z = 0.0;
 
-      tf2::Quaternion q;
-      q.setRPY(0, 0, pose.theta);
-      pose_stamped.pose.orientation = tf2::toMsg(q);
-
       ros_path.poses.push_back(pose_stamped);
     }
 
@@ -445,9 +441,9 @@ private:
     lookahead_marker.pose.position.y = lookahead_point.y;
     lookahead_marker.pose.position.z = 0.0;
 
-    lookahead_marker.scale.x = 0.2;
-    lookahead_marker.scale.y = 0.2;
-    lookahead_marker.scale.z = 0.2;
+    lookahead_marker.scale.x = 0.05;
+    lookahead_marker.scale.y = 0.05;
+    lookahead_marker.scale.z = 0.05;
 
     lookahead_marker.color.r = 1.0;
     lookahead_marker.color.g = 0.0;
@@ -546,7 +542,7 @@ private:
 
   geometry_msgs::msg::PoseStamped start_pose_;
   geometry_msgs::msg::PoseStamped goal_pose_;
-  std::vector<geometry::Pose3d> path_;
+  std::vector<geometry::Pose2d> path_;
 
   utils::EDT edt_;
   utils::TrigTable trig_table_ = utils::TrigTable(10000);

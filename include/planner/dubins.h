@@ -20,7 +20,7 @@ public:
   void setMinTurningRadius(double min_radius);
   void simulate(const geometry::Pose3d &start, const geometry::Pose3d &end);
   double getOptimalDistance();
-  std::vector<geometry::Pose3d> getOptimalPath();
+  std::vector<geometry::Pose2d> getOptimalPath();
 
 private:
   struct PathElement {

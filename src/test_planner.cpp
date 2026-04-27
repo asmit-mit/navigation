@@ -147,7 +147,7 @@ private:
     publishPath(path);
   }
 
-  void publishPath(const std::vector<geometry::Pose3d> &path_vec) {
+  void publishPath(const std::vector<geometry::Pose2d> &path_vec) {
     nav_msgs::msg::Path path_msg;
     path_msg.header.frame_id = "map";
     path_msg.header.stamp = this->now();
@@ -159,12 +159,6 @@ private:
       pose.pose.position.x = p.x;
       pose.pose.position.y = p.y;
       pose.pose.position.z = 0.0;
-
-      double half_theta = p.theta * 0.5;
-      pose.pose.orientation.x = 0.0;
-      pose.pose.orientation.y = 0.0;
-      pose.pose.orientation.z = sin(half_theta);
-      pose.pose.orientation.w = cos(half_theta);
 
       path_msg.poses.push_back(pose);
     }

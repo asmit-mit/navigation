@@ -17,7 +17,7 @@ navigation:
       robot_radius: 0.1
 
     planner:
-      frequency: 5
+      frequency: 1
       max_linear_velocity: 1.0
       max_angular_velocity: 2.0
       angular_resolution: 5.0

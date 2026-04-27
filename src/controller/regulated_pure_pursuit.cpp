@@ -45,7 +45,7 @@ RegulatedPurePursuit::computeCommand(const geometry::Pose3d &curr_pose,
                                      const geometry::Pose3d &goal_pose,
                                      double linear_velocity,
                                      double angular_velocity,
-                                     const std::vector<geometry::Pose3d> &plan) {
+                                     const std::vector<geometry::Pose2d> &plan) {
   if (shouldRotateToGoalHeading(curr_pose, goal_pose)) {
     double angle_to_goal = utils::M(goal_pose.theta - curr_pose.theta);
     return rotateToHeading(angle_to_goal, angular_velocity);
@@ -60,13 +60,18 @@ RegulatedPurePursuit::computeCommand(const geometry::Pose3d &curr_pose,
   double cusp_dist = computeCuspDistance(curr_pose, closest_idx, lookahead_dist, plan);
   lookahead_dist = std::min(lookahead_dist, cusp_dist);
 
-  lookahead_point_ = findLookaheadPoint(closest_idx, curr_pose, plan, lookahead_dist);
+  lookahead_point_ = findLookaheadPoint(curr_pose, lookahead_dist, closest_idx, plan);
 
-  // double last_sign = (linear_velocity >= 0.0) ? 1.0 : -1.0;
-  // double sign = computeDirectionSign(closest_idx, last_sign, plan);
+  double dx = lookahead_point_.x - curr_pose.x;
+  double dy = lookahead_point_.y - curr_pose.y;
+
+  double cos_yaw = trig_table_->cos(curr_pose.theta);
+  double sin_yaw = trig_table_->sin(curr_pose.theta);
+
+  double x_r = cos_yaw * dx + sin_yaw * dy;
+  double sign = (x_r >= 0.0) ? 1.0 : -1.0;
   // std::cerr << "Sign:" << sign << "\n";
 
-  double sign = 1.0;
   double k = sign * computeCurvature(curr_pose, lookahead_point_);
 
   double angle_to_lookahead = angleToTarget(curr_pose, lookahead_point_);
@@ -79,10 +84,9 @@ RegulatedPurePursuit::computeCommand(const geometry::Pose3d &curr_pose,
   v = std::min(v, regulateByGoalProximity(v, curr_pose, plan));
 
   double best_v, best_w;
-  const double min_feasible = linear_velocity - max_linear_accel_ * dt_;
-  const double max_feasible = linear_velocity + max_linear_accel_ * dt_;
-
-  best_v = sign * std::clamp(v, min_feasible, max_feasible);
+  const double min_feasible = std::abs(linear_velocity) - max_linear_accel_ * dt_;
+  const double max_feasible = std::abs(linear_velocity) + max_linear_accel_ * dt_;
+  best_v = sign * std::clamp(v, std::max(0.0, min_feasible), max_feasible);
   best_w = std::clamp(k * best_v, -max_angular_vel_, max_angular_vel_);
 
   if (checkCollision(curr_pose, best_v, best_w, lookahead_dist)) {
@@ -94,7 +98,7 @@ RegulatedPurePursuit::computeCommand(const geometry::Pose3d &curr_pose,
 }
 
 size_t RegulatedPurePursuit::findCosestIdx(const geometry::Pose3d &curr_pose,
-                                           const std::vector<geometry::Pose3d> &plan) {
+                                           const std::vector<geometry::Pose2d> &plan) {
   size_t closest_idx = 0;
   double min_dist = std::numeric_limits<double>::max();
   for (size_t i = 0; i < plan.size(); ++i) {
@@ -108,10 +112,11 @@ size_t RegulatedPurePursuit::findCosestIdx(const geometry::Pose3d &curr_pose,
   return closest_idx;
 }
 
-geometry::Pose3d RegulatedPurePursuit::findLookaheadPoint(size_t closest_idx,
-                                                          const geometry::Pose3d &curr_pose,
-                                                          const std::vector<geometry::Pose3d> &plan,
-                                                          double lookahead_dist) const {
+geometry::Pose2d
+RegulatedPurePursuit::findLookaheadPoint(const geometry::Pose3d &curr_pose,
+                                         double lookahead_dist,
+                                         size_t closest_idx,
+                                         const std::vector<geometry::Pose2d> &plan) const {
   for (size_t i = closest_idx; i < plan.size(); ++i) {
     double dist = utils::distance(curr_pose, plan[i]);
     if (dist >= lookahead_dist)
@@ -121,10 +126,10 @@ geometry::Pose3d RegulatedPurePursuit::findLookaheadPoint(size_t closest_idx,
   return plan.back();
 }
 
-geometry::Pose3d RegulatedPurePursuit::getLookaheadPoint() const { return lookahead_point_; }
+geometry::Pose2d RegulatedPurePursuit::getLookaheadPoint() const { return lookahead_point_; }
 
 double RegulatedPurePursuit::computeCurvature(const geometry::Pose3d &curr_pose,
-                                              const geometry::Pose3d &lookahead_point) const {
+                                              const geometry::Pose2d &lookahead_point) const {
   double dx = lookahead_point.x - curr_pose.x;
   double dy = lookahead_point.y - curr_pose.y;
   double theta = curr_pose.theta;
@@ -160,7 +165,7 @@ double RegulatedPurePursuit::regulateByCostmap(double v, const geometry::Pose3d 
 }
 
 double RegulatedPurePursuit::regulateByGoalProximity(
-    double v, const geometry::Pose3d &curr_pose, const std::vector<geometry::Pose3d> &plan) const {
+    double v, const geometry::Pose3d &curr_pose, const std::vector<geometry::Pose2d> &plan) const {
   double dist_to_goal = utils::distance(curr_pose, plan.back());
   if (dist_to_goal >= approach_velocity_scaling_dist_)
     return v;
@@ -174,7 +179,7 @@ double RegulatedPurePursuit::regulateByGoalProximity(
 }
 
 double RegulatedPurePursuit::angleToTarget(const geometry::Pose3d &curr_pose,
-                                           const geometry::Pose3d &target) const {
+                                           const geometry::Pose2d &target) const {
   double dx = target.x - curr_pose.x;
   double dy = target.y - curr_pose.y;
   double bearing = std::atan2(dy, dx);
@@ -232,68 +237,36 @@ bool RegulatedPurePursuit::checkCollision(const geometry::Pose3d &curr_pose,
 }
 
 double RegulatedPurePursuit::computeLookaheadDistance(double linear_velocity) const {
-  return std::clamp(
-      lookahead_gain_ * linear_velocity, min_lookahead_distance_, max_lookahead_distance_);
+  return std::clamp(lookahead_gain_ * std::abs(linear_velocity),
+                    min_lookahead_distance_,
+                    max_lookahead_distance_);
 }
+
 double RegulatedPurePursuit::computeCuspDistance(const geometry::Pose3d &curr_pose,
                                                  size_t closest_idx,
                                                  double lookahead_dist,
-                                                 const std::vector<geometry::Pose3d> &plan) {
-  for (size_t i = closest_idx; i + 2 < plan.size(); ++i) {
+                                                 const std::vector<geometry::Pose2d> &plan) {
+  if (plan.size() < 3 || closest_idx >= plan.size() - 2)
+    return std::numeric_limits<double>::infinity();
 
-    double dx1 = plan[i + 1].x - plan[i].x;
-    double dy1 = plan[i + 1].y - plan[i].y;
+  for (size_t i = closest_idx + 1; i + 1 < plan.size(); ++i) {
+    double dx1 = plan[i].x - plan[i - 1].x;
+    double dy1 = plan[i].y - plan[i - 1].y;
+    double dx2 = plan[i + 1].x - plan[i].x;
+    double dy2 = plan[i + 1].y - plan[i].y;
 
-    double dx2 = plan[i + 2].x - plan[i + 1].x;
-    double dy2 = plan[i + 2].y - plan[i + 1].y;
-
-    double dot = dx1 * dx2 + dy1 * dy2;
+    double dot = (dx1 * dx2 + dy1 * dy2);
 
     double dist = utils::distance(curr_pose, plan[i]);
 
-    if (dot < 0)
-      return dist;
-
     if (dist >= lookahead_dist)
       return lookahead_dist;
+
+    if (dot < epsilon_)
+      return dist;
   }
 
   return std::numeric_limits<double>::infinity();
-}
-
-bool RegulatedPurePursuit::isLookingTowards(const geometry::Pose3d &p0,
-                                            const geometry::Pose3d &p1) {
-  double dx = p0.x - p1.x;
-  double dy = p0.y - p1.y;
-
-  double hx = trig_table_->cos(p1.theta);
-  double hy = trig_table_->sin(p1.theta);
-
-  double dot = dx * hx + dy * hy;
-  return dot > 0;
-}
-
-double RegulatedPurePursuit::computeDirectionSign(size_t closest_idx,
-                                                  double last_sign,
-                                                  const std::vector<geometry::Pose3d> &plan) {
-  size_t look_ahead_idx = std::min(closest_idx + 3, plan.size() - 1);
-
-  double dx = plan[look_ahead_idx].x - plan[closest_idx].x;
-  double dy = plan[look_ahead_idx].y - plan[closest_idx].y;
-
-  double mag = std::sqrt(dx * dx + dy * dy);
-  if (mag < epsilon_)
-    return last_sign;
-
-  dx /= mag;
-  dy /= mag;
-
-  double hx = trig_table_->cos(plan[closest_idx].theta);
-  double hy = trig_table_->sin(plan[closest_idx].theta);
-
-  double dot = dx * hx + dy * hy;
-  last_sign = (dot >= 0.0) ? 1.0 : -1.0;
-  return last_sign;
 }
 
 } // namespace controller

@@ -26,7 +26,7 @@ public:
   void setStart(double x, double y, double theta);
   void setGoal(double x, double y, double theta);
 
-  std::vector<geometry::Pose3d> getPlan();
+  std::vector<geometry::Pose2d> getPlan();
 
 private:
   struct Node {
@@ -56,7 +56,7 @@ private:
   void buildObstacleCostTable();
   double heuristic(const Node *node);
   bool goalReached(const Node *node);
-  std::vector<geometry::Pose3d> analyticalExpansion(const Node *node);
+  std::vector<geometry::Pose2d> analyticalExpansion(const Node *node);
   std::vector<std::pair<geometry::Pose3d, double>> expand(const Node *node);
 
   void simulate();
@@ -100,7 +100,7 @@ private:
 
   utils::GenVector<double> holonomic_with_obstacle_cost_;
 
-  std::vector<geometry::Pose3d> plan_;
+  std::vector<geometry::Pose2d> plan_;
 
   std::array<std::pair<double, double>, 6> controls_;
   int controls_count_;

@@ -15,7 +15,7 @@ public:
   void setWeights(double smooth, double data);
   void setIterations(int iterations);
 
-  std::vector<geometry::Pose3d> getSmoothPath(std::vector<geometry::Pose3d> &plan) const;
+  std::vector<geometry::Pose2d> getSmoothPath(std::vector<geometry::Pose2d> &plan) const;
 
 private:
   int iterations_;
